@@ -23,10 +23,7 @@ def _checkpoint_path(db_path: str) -> str:
 
 def _build_scaffold(cfg, spec_path: str, checkpointer):
     client = anthropic.Anthropic()
-    bot = TelegramBot(
-        token=cfg.project.telegram_bot_token,
-        chat_id=cfg.project.telegram_chat_id,
-    )
+    bot = TelegramBot(token="", chat_id="")
     graph = build_graph(
         client=client,
         bot=bot,

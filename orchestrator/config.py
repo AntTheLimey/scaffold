@@ -12,7 +12,9 @@ class GovernanceConfig:
 
 @dataclass
 class AgentsConfig:
-    roles: dict[str, dict]
+    workflow: dict[str, dict]
+    specialists: dict[str, dict]
+    escalation: dict
 
 
 @dataclass
@@ -20,10 +22,7 @@ class ProjectConfig:
     repo_path: str
     branch_prefix: str = "scaffold"
     max_concurrent_agents: int = 3
-    telegram_bot_token: str = ""
-    telegram_chat_id: str = ""
     db_path: str = "scaffold.db"
-    spec_path: str = ""
 
 
 @dataclass
@@ -45,7 +44,11 @@ def load_config(config_dir: str | Path) -> ScaffoldConfig:
 
     with open(config_dir / "agents.yaml") as f:
         agents_data = yaml.safe_load(f)
-    agents = AgentsConfig(roles=agents_data.get("roles", {}))
+    agents = AgentsConfig(
+        workflow=agents_data.get("workflow", {}),
+        specialists=agents_data.get("specialists", {}),
+        escalation=agents_data.get("escalation", {}),
+    )
 
     with open(config_dir / "project.yaml") as f:
         proj_data = yaml.safe_load(f)

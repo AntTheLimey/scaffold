@@ -1,29 +1,60 @@
-roles:
+workflow:
   product_owner:
-    model: claude-opus-4-20250514
+    model: claude-opus-4-6
     execution: api
   architect:
-    model: claude-opus-4-20250514
+    model: claude-opus-4-6
     execution: api
   designer:
-    model: claude-sonnet-4-20250514
+    model: claude-sonnet-4-6
     execution: api
-  developer:
-    model: claude-sonnet-4-20250514
-    execution: cli
-    max_iterations: 10
-    completion_promise: "TASK COMPLETE"
   reviewer:
-    model: claude-sonnet-4-20250514
+    model: claude-sonnet-4-6
     execution: cli
   qa:
-    model: claude-sonnet-4-20250514
+    model: claude-sonnet-4-6
     execution: cli
     max_iterations: 8
     completion_promise: "TESTS PASSING"
+  consensus:
+    model: claude-opus-4-6
+    execution: api
+
+specialists:
+  python-expert:
+    model: claude-sonnet-4-6
+    execution: cli
+    max_iterations: 10
+    completion_promise: "TASK COMPLETE"
+  go-expert:
+    model: claude-sonnet-4-6
+    execution: cli
+    max_iterations: 10
+    completion_promise: "TASK COMPLETE"
+  react-expert:
+    model: claude-sonnet-4-6
+    execution: cli
+    max_iterations: 10
+    completion_promise: "TASK COMPLETE"
+  typescript-expert:
+    model: claude-sonnet-4-6
+    execution: cli
+    max_iterations: 10
+    completion_promise: "TASK COMPLETE"
+  postgres-expert:
+    model: claude-opus-4-6
+    execution: api
+  documentation-writer:
+    model: claude-sonnet-4-6
+    execution: cli
+    max_iterations: 5
+    completion_promise: "TASK COMPLETE"
+  security-auditor:
+    model: claude-opus-4-6
+    execution: api
 
 escalation:
-  stuck_loop_model: claude-opus-4-20250514
+  stuck_loop_model: claude-opus-4-6
   max_review_cycles: 3
   max_bug_cycles: 3
   cost_threshold_per_run: 5.00
