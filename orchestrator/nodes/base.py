@@ -1,3 +1,4 @@
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -51,3 +52,78 @@ class AdvisorAgent:
             token_in=response.usage.input_tokens,
             token_out=response.usage.output_tokens,
         )
+
+
+@dataclass
+class RalphResult:
+    success: bool
+    iterations: int
+    output: str
+
+
+class DoerAgent:
+    def __init__(
+        self,
+        role: str,
+        model: str,
+        max_iterations: int = 10,
+        completion_promise: str = "TASK COMPLETE",
+    ):
+        self.role = role
+        self.model = model
+        self.max_iterations = max_iterations
+        self.completion_promise = completion_promise
+
+    def create_worktree(self, repo_path: Path | str, branch: str) -> Path:
+        repo_path = Path(repo_path)
+        worktree_dir = repo_path.parent / f".worktrees/{branch.replace('/', '-')}"
+        subprocess.run(
+            ["git", "worktree", "add", "-b", branch, str(worktree_dir)],
+            cwd=repo_path,
+            capture_output=True,
+            check=True,
+        )
+        return worktree_dir
+
+    def cleanup_worktree(self, repo_path: Path | str, worktree_path: Path | str) -> None:
+        repo_path = Path(repo_path)
+        subprocess.run(
+            ["git", "worktree", "remove", str(worktree_path)],
+            cwd=repo_path,
+            capture_output=True,
+        )
+
+    def ralph_loop(
+        self,
+        worktree_path: str | Path,
+        prompt: str,
+        failure_context: str = "",
+    ) -> RalphResult:
+        last_output = ""
+        for i in range(1, self.max_iterations + 1):
+            if i > 1 and last_output:
+                current_prompt = (
+                    f"{prompt}\n\n--- PREVIOUS ATTEMPT (iteration {i-1}) ---\n"
+                    f"{last_output}\n--- END PREVIOUS ATTEMPT ---\n\n"
+                    "The previous attempt did not complete the task. "
+                    "Fix the issues and try again."
+                )
+            elif failure_context:
+                current_prompt = (
+                    f"{prompt}\n\n--- FAILURE CONTEXT ---\n{failure_context}\n---"
+                )
+            else:
+                current_prompt = prompt
+
+            result = subprocess.run(
+                ["claude", "--model", self.model, "-p", current_prompt],
+                capture_output=True,
+                text=True,
+                cwd=str(worktree_path),
+                timeout=600,
+            )
+            last_output = result.stdout
+            if self.completion_promise in result.stdout:
+                return RalphResult(success=True, iterations=i, output=result.stdout)
+
+        return RalphResult(success=False, iterations=self.max_iterations, output=last_output)
