@@ -21,7 +21,7 @@ class TaskTree:
         spec_ref: str | None = None,
         acceptance: list[str] | None = None,
     ) -> str:
-        task_id = str(uuid.uuid4())[:8]
+        task_id = str(uuid.uuid4())[:12]
         self.conn.execute(
             "INSERT INTO tasks (id, parent_id, level, status, title, spec_ref, acceptance) "
             "VALUES (?, ?, ?, 'pending', ?, ?, ?)",

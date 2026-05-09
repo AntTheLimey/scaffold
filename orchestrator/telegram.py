@@ -10,6 +10,16 @@ class TelegramBot:
         self.chat_id = chat_id
         self.base_url = TELEGRAM_API.format(token=token)
         self.client = httpx.Client(timeout=30)
+        self._offset = 0
+
+    def close(self) -> None:
+        self.client.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
 
     def send_escalation(
         self, question: str, options: list[str], task_id: str
@@ -51,11 +61,16 @@ class TelegramBot:
     def poll_for_callback(self, timeout: int = 300) -> dict | None:
         resp = self.client.post(
             f"{self.base_url}/getUpdates",
-            json={"timeout": timeout, "allowed_updates": ["callback_query"]},
+            json={
+                "timeout": timeout,
+                "offset": self._offset,
+                "allowed_updates": ["callback_query"],
+            },
         )
         resp.raise_for_status()
         updates = resp.json().get("result", [])
         for update in updates:
+            self._offset = update["update_id"] + 1
             if "callback_query" in update:
                 data = json.loads(update["callback_query"]["data"])
                 self.client.post(

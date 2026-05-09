@@ -16,7 +16,7 @@ class Telemetry:
         agent_role: str | None = None,
         run_id: str | None = None,
     ) -> str:
-        event_id = str(uuid.uuid4())[:8]
+        event_id = str(uuid.uuid4())[:12]
         self.conn.execute(
             "INSERT INTO events (id, task_id, agent_role, run_id, event_type, event_data) "
             "VALUES (?, ?, ?, ?, ?, ?)",
@@ -47,7 +47,7 @@ class Telemetry:
         return row["cnt"]
 
     def start_run(self, task_id: str, agent_role: str, model: str) -> str:
-        run_id = str(uuid.uuid4())[:8]
+        run_id = str(uuid.uuid4())[:12]
         self.conn.execute(
             "INSERT INTO agent_runs (id, task_id, agent_role, model) VALUES (?, ?, ?, ?)",
             (run_id, task_id, agent_role, model),

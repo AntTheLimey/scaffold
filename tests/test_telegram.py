@@ -34,3 +34,30 @@ def test_send_digest(mock_post, bot):
         done=5, in_progress=3, blocked=1, cost_today=2.50
     )
     mock_post.assert_called_once()
+
+
+def test_bot_context_manager():
+    bot = TelegramBot(token="fake-token", chat_id="12345")
+    with bot:
+        pass
+
+
+@patch("orchestrator.telegram.httpx.Client.post")
+def test_poll_tracks_offset(mock_post, bot):
+    mock_post.return_value = MagicMock(
+        json=lambda: {
+            "ok": True,
+            "result": [
+                {
+                    "update_id": 100,
+                    "callback_query": {
+                        "id": "cb1",
+                        "data": '{"task": "t1", "choice": "Approve"}',
+                    },
+                }
+            ],
+        },
+        raise_for_status=MagicMock(),
+    )
+    bot.poll_for_callback(timeout=1)
+    assert bot._offset == 101
