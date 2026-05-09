@@ -1,5 +1,6 @@
-import json
 from pathlib import Path
+
+from orchestrator.json_utils import extract_json
 
 from orchestrator.nodes.base import AdvisorAgent
 from orchestrator.state import TaskState
@@ -41,7 +42,7 @@ def make_product_owner_node(client, spec_path: str):
             cache_system=True,
         )
 
-        parsed = json.loads(result.text)
+        parsed = extract_json(result.text)
         return {
             "child_tasks": parsed.get("children", []),
             "status": "decomposing",

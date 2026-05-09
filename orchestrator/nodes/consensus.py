@@ -1,5 +1,4 @@
-import json
-
+from orchestrator.json_utils import extract_json
 from orchestrator.nodes.base import AdvisorAgent
 from orchestrator.state import TaskState
 
@@ -29,7 +28,7 @@ def make_consensus_node(client):
                         f"- {p}" for p in positions
                     )
                 result = agent.call(system_prompt=SYSTEM_PROMPT, user_message=prompt)
-                parsed = json.loads(result.text)
+                parsed = extract_json(result.text)
                 positions.append(f"{party}: {parsed['position']}")
                 if parsed.get("concedes", False):
                     return {

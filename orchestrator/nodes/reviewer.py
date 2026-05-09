@@ -1,5 +1,6 @@
-import json
 import subprocess
+
+from orchestrator.json_utils import extract_json
 
 from orchestrator.state import TaskState
 
@@ -11,9 +12,9 @@ REVIEW_PROMPT = (
 )
 
 
-def make_reviewer_node(repo_path: str, model: str):
+def make_reviewer_node(repo_path: str, branch_prefix: str, model: str):
     def reviewer_node(state: TaskState) -> dict:
-        branch = f"scaffold/{state['task_id']}"
+        branch = f"{branch_prefix}/{state['task_id']}"
         prompt = (
             f"{REVIEW_PROMPT}\n\n"
             f"Task: {state['task_id']}\n"
@@ -28,7 +29,7 @@ def make_reviewer_node(repo_path: str, model: str):
             timeout=300,
         )
 
-        parsed = json.loads(result.stdout)
+        parsed = extract_json(result.stdout)
         verdict = parsed.get("verdict", "revise")
         feedback = parsed.get("feedback", "")
 

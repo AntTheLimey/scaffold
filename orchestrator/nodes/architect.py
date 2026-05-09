@@ -1,5 +1,4 @@
-import json
-
+from orchestrator.json_utils import extract_json
 from orchestrator.nodes.base import AdvisorAgent
 from orchestrator.state import TaskState
 
@@ -32,7 +31,7 @@ def make_architect_node(client):
             cache_system=True,
         )
 
-        parsed = json.loads(result.text)
+        parsed = extract_json(result.text)
         return {
             "has_ui_component": parsed.get("has_ui_component", False),
             "child_tasks": parsed.get("children", []),
