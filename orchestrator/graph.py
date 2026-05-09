@@ -64,6 +64,7 @@ def build_graph(
     branch_prefix: str,
     spec_path: str,
     model: str,
+    checkpointer=None,
 ):
     graph = StateGraph(TaskState)
 
@@ -132,4 +133,4 @@ def build_graph(
         },
     )
 
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)

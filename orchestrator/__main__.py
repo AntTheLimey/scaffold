@@ -2,6 +2,9 @@ from pathlib import Path
 
 import anthropic
 import click
+from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.types import Command
 
 from orchestrator.config import load_config
 from orchestrator.db import get_connection, init_db
@@ -9,6 +12,31 @@ from orchestrator.graph import build_graph
 from orchestrator.state import initial_state
 from orchestrator.task_tree import TaskTree
 from orchestrator.telegram import TelegramBot
+
+
+def _checkpoint_path(db_path: str) -> str:
+    if db_path == ":memory:":
+        return ":memory:"
+    p = Path(db_path)
+    return str(p.parent / f"{p.stem}_checkpoints{p.suffix}")
+
+
+def _build_scaffold(cfg, spec_path: str, checkpointer):
+    client = anthropic.Anthropic()
+    bot = TelegramBot(
+        token=cfg.project.telegram_bot_token,
+        chat_id=cfg.project.telegram_chat_id,
+    )
+    graph = build_graph(
+        client=client,
+        bot=bot,
+        repo_path=cfg.project.repo_path,
+        branch_prefix=cfg.project.branch_prefix,
+        spec_path=spec_path,
+        model="claude-sonnet-4-20250514",
+        checkpointer=checkpointer,
+    )
+    return graph, bot
 
 
 @click.group()
@@ -27,43 +55,47 @@ def run(spec, config):
     cfg = load_config(config)
     conn = init_db(cfg.project.db_path)
 
-    client = anthropic.Anthropic()
-    bot = TelegramBot(
-        token=cfg.project.telegram_bot_token,
-        chat_id=cfg.project.telegram_chat_id,
-    )
+    with SqliteSaver.from_conn_string(_checkpoint_path(cfg.project.db_path)) as checkpointer:
+        graph, bot = _build_scaffold(cfg, spec, checkpointer)
+        try:
+            tree = TaskTree(conn)
+            task_id = tree.create(title="Root", level="epic", spec_ref=spec)
+            state = initial_state(task_id=task_id, level="epic")
+            thread_config: RunnableConfig = {"configurable": {"thread_id": task_id}}
 
-    graph = build_graph(
-        client=client,
-        bot=bot,
-        repo_path=cfg.project.repo_path,
-        branch_prefix=cfg.project.branch_prefix,
-        spec_path=spec,
-        model="claude-sonnet-4-20250514",
-    )
+            click.echo(f"Scaffold started. Task: {task_id}, DB: {cfg.project.db_path}")
 
-    tree = TaskTree(conn)
-    task_id = tree.create(title="Root", level="epic", spec_ref=spec)
-    state = initial_state(task_id=task_id, level="epic")
-
-    click.echo(f"Scaffold started. Task: {task_id}, DB: {cfg.project.db_path}")
-
-    result = graph.invoke(state)
-    click.echo(f"Run complete. Status: {result.get('status', 'unknown')}")
+            result = graph.invoke(state, config=thread_config)
+            click.echo(f"Run complete. Status: {result.get('status', 'unknown')}")
+        finally:
+            bot.close()
     conn.close()
 
 
 @cli.command()
+@click.option("--task", required=True, help="Task ID to resume")
 @click.option("--db", default="scaffold.db", help="Path to scaffold database")
 @click.option(
     "--config", required=True, type=click.Path(exists=True), help="Path to config directory"
 )
-def resume(db, config):
+@click.option("--spec", default="", help="Path to master spec (needed if re-entering planning)")
+def resume(task, db, config, spec):
     """Resume an interrupted scaffold run."""
     if not Path(db).exists():
         click.echo("No database found. Run 'scaffold run' first.")
         raise SystemExit(1)
-    click.echo(f"Resuming from {db}")
+
+    cfg = load_config(config)
+
+    with SqliteSaver.from_conn_string(_checkpoint_path(db)) as checkpointer:
+        graph, bot = _build_scaffold(cfg, spec, checkpointer)
+        try:
+            thread_config: RunnableConfig = {"configurable": {"thread_id": task}}
+            click.echo(f"Resuming task {task} from {db}")
+            result = graph.invoke(None, config=thread_config)
+            click.echo(f"Resume complete. Status: {result.get('status', 'unknown')}")
+        finally:
+            bot.close()
 
 
 @cli.command()
@@ -72,12 +104,30 @@ def resume(db, config):
     "--choice", required=True, type=click.Choice(["Approve", "Revise", "Override", "Cancel"])
 )
 @click.option("--db", default="scaffold.db", help="Path to scaffold database")
-def decide(task, choice, db):
+@click.option(
+    "--config", required=True, type=click.Path(exists=True), help="Path to config directory"
+)
+@click.option("--spec", default="", help="Path to master spec (needed if re-entering planning)")
+def decide(task, choice, db, config, spec):
     """Provide a human decision for a paused task."""
     if not Path(db).exists():
         click.echo("No database found.")
         raise SystemExit(1)
-    click.echo(f"Decision recorded: {choice} for task {task}")
+
+    cfg = load_config(config)
+
+    with SqliteSaver.from_conn_string(_checkpoint_path(db)) as checkpointer:
+        graph, bot = _build_scaffold(cfg, spec, checkpointer)
+        try:
+            thread_config: RunnableConfig = {"configurable": {"thread_id": task}}
+            result = graph.invoke(
+                Command(resume={"choice": choice}),
+                config=thread_config,
+            )
+            click.echo(f"Decision applied: {choice} for task {task}")
+            click.echo(f"Status: {result.get('status', 'unknown')}")
+        finally:
+            bot.close()
 
 
 @cli.command()
