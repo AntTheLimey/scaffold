@@ -86,3 +86,24 @@ def test_qa_routes_fail_to_developer():
     state["verdict"] = "fail"
     state["bug_cycles"] = 1
     assert qa_router(state) == "developer"
+
+
+def test_human_gate_routes_revise_to_developer():
+    from orchestrator.graph import human_gate_router
+    state = initial_state(task_id="t1", level="task")
+    state["verdict"] = "Revise"
+    assert human_gate_router(state) == "developer"
+
+
+def test_human_gate_routes_approve_to_end():
+    from orchestrator.graph import human_gate_router
+    state = initial_state(task_id="t1", level="task")
+    state["verdict"] = "Approve"
+    assert human_gate_router(state) == "__end__"
+
+
+def test_human_gate_routes_cancel_to_end():
+    from orchestrator.graph import human_gate_router
+    state = initial_state(task_id="t1", level="task")
+    state["verdict"] = "Cancel"
+    assert human_gate_router(state) == "__end__"

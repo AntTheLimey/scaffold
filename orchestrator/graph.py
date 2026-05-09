@@ -50,6 +50,13 @@ def qa_router(state: TaskState) -> str:
     return "developer"
 
 
+def human_gate_router(state: TaskState) -> str:
+    verdict = state.get("verdict", "")
+    if verdict == "Revise":
+        return "developer"
+    return "__end__"
+
+
 def build_graph(
     client,
     bot,
@@ -100,6 +107,9 @@ def build_graph(
     })
 
     graph.add_edge("consensus", "human_gate")
-    graph.add_edge("human_gate", END)
+    graph.add_conditional_edges("human_gate", human_gate_router, {
+        "developer": "developer",
+        "__end__": END,
+    })
 
     return graph.compile()
