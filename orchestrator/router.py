@@ -26,7 +26,9 @@ class Router:
         return self.governance.rapid[decision_type]
 
     def get_accountable(self, activity: str) -> str:
-        return self.governance.raci[activity]["accountable"]
+        value = self.governance.raci[activity]["accountable"]
+        assert isinstance(value, str), f"Expected str for accountable, got {type(value)}"
+        return value
 
     def get_consulted(self, activity: str) -> list[str]:
         consulted = self.governance.raci[activity].get("consulted", [])

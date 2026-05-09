@@ -33,6 +33,8 @@ addopts = "--tb=short -q"
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
 include = ["orchestrator"]
 exclude = ["tests", ".venv", "build"]
 reportMissingImports = true
