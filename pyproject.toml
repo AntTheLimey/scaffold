@@ -1,0 +1,23 @@
+[project]
+name = "agentic-scaffold"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph>=1.0.0",
+    "langgraph-checkpoint-sqlite>=2.0.0",
+    "anthropic>=0.45.0",
+    "pyyaml>=6.0",
+    "httpx>=0.27.0",
+    "click>=8.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+scaffold = "orchestrator.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["orchestrator*"]
