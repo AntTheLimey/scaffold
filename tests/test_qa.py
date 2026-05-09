@@ -1,7 +1,7 @@
-from unittest.mock import patch, MagicMock
-import pytest
-from orchestrator.nodes.qa import make_qa_node
+from unittest.mock import MagicMock, patch
+
 from orchestrator.nodes.base import RalphResult
+from orchestrator.nodes.qa import make_qa_node
 from orchestrator.state import initial_state
 
 
@@ -13,7 +13,9 @@ def test_qa_passes(MockDoer):
     )
     doer.create_worktree.return_value = "/tmp/qa-worktree"
     doer.cleanup_worktree = MagicMock()
-    node_fn = make_qa_node(repo_path="/tmp/repo", branch_prefix="scaffold", model="claude-sonnet-4-20250514")
+    node_fn = make_qa_node(
+        repo_path="/tmp/repo", branch_prefix="scaffold", model="claude-sonnet-4-20250514"
+    )
     state = initial_state(task_id="task-001", level="task")
     state["status"] = "testing"
     result = node_fn(state)
@@ -30,7 +32,9 @@ def test_qa_fails(MockDoer):
     )
     doer.create_worktree.return_value = "/tmp/qa-worktree"
     doer.cleanup_worktree = MagicMock()
-    node_fn = make_qa_node(repo_path="/tmp/repo", branch_prefix="scaffold", model="claude-sonnet-4-20250514")
+    node_fn = make_qa_node(
+        repo_path="/tmp/repo", branch_prefix="scaffold", model="claude-sonnet-4-20250514"
+    )
     state = initial_state(task_id="task-001", level="task")
     state["status"] = "testing"
     result = node_fn(state)

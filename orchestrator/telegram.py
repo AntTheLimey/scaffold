@@ -1,4 +1,5 @@
 import json
+
 import httpx
 
 TELEGRAM_API = "https://api.telegram.org/bot{token}"
@@ -21,9 +22,7 @@ class TelegramBot:
     def __exit__(self, *args):
         self.close()
 
-    def send_escalation(
-        self, question: str, options: list[str], task_id: str
-    ) -> int:
+    def send_escalation(self, question: str, options: list[str], task_id: str) -> int:
         keyboard = {
             "inline_keyboard": [
                 [{"text": opt, "callback_data": json.dumps({"task": task_id, "choice": opt})}]
@@ -42,9 +41,7 @@ class TelegramBot:
         resp.raise_for_status()
         return resp.json()["result"]["message_id"]
 
-    def send_digest(
-        self, done: int, in_progress: int, blocked: int, cost_today: float
-    ) -> None:
+    def send_digest(self, done: int, in_progress: int, blocked: int, cost_today: float) -> None:
         text = (
             f"Status Digest\n\n"
             f"Done: {done}\n"

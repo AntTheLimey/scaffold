@@ -1,7 +1,8 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from click.testing import CliRunner
 import pytest
+from click.testing import CliRunner
+
 from orchestrator.__main__ import cli
 
 
@@ -30,16 +31,22 @@ def test_cli_run_requires_spec(runner):
 def test_cli_run_builds_graph(runner, tmp_path, config_dir):
     spec = tmp_path / "spec.md"
     spec.write_text("# Test Spec\nBuild a thing.")
-    with patch("orchestrator.__main__.build_graph") as mock_build, \
-         patch("orchestrator.__main__.anthropic") as mock_anthropic, \
-         patch("orchestrator.__main__.TelegramBot"):
+    with (
+        patch("orchestrator.__main__.build_graph") as mock_build,
+        patch("orchestrator.__main__.TelegramBot"),
+    ):
         mock_graph = MagicMock()
         mock_build.return_value = mock_graph
-        result = runner.invoke(cli, [
-            "run",
-            "--spec", str(spec),
-            "--config", str(config_dir),
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "run",
+                "--spec",
+                str(spec),
+                "--config",
+                str(config_dir),
+            ],
+        )
         assert result.exit_code == 0
         mock_build.assert_called_once()
 

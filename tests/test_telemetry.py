@@ -1,5 +1,7 @@
 import json
+
 import pytest
+
 from orchestrator.telemetry import Telemetry
 
 
@@ -54,7 +56,7 @@ def test_count_cycles(telemetry, db):
         ("task-001", "task", "in_progress", "Test"),
     )
     db.commit()
-    for i in range(3):
+    for _ in range(3):
         telemetry.log(
             task_id="task-001",
             event_type="task.cycle",
@@ -97,9 +99,7 @@ def test_finish_run(telemetry, db):
     )
     db.commit()
     run_id = telemetry.start_run("task-001", "developer", "claude-sonnet-4-20250514")
-    telemetry.finish_run(
-        run_id, outcome="success", iterations=3, token_in=1000, token_out=500
-    )
+    telemetry.finish_run(run_id, outcome="success", iterations=3, token_in=1000, token_out=500)
     run = db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,)).fetchone()
     assert run["outcome"] == "success"
     assert run["iterations"] == 3

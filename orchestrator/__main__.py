@@ -4,7 +4,7 @@ import anthropic
 import click
 
 from orchestrator.config import load_config
-from orchestrator.db import init_db, get_connection
+from orchestrator.db import get_connection, init_db
 from orchestrator.graph import build_graph
 from orchestrator.state import initial_state
 from orchestrator.task_tree import TaskTree
@@ -19,7 +19,9 @@ def cli():
 
 @cli.command()
 @click.option("--spec", required=True, type=click.Path(exists=True), help="Path to master spec")
-@click.option("--config", required=True, type=click.Path(exists=True), help="Path to config directory")
+@click.option(
+    "--config", required=True, type=click.Path(exists=True), help="Path to config directory"
+)
 def run(spec, config):
     """Start a new scaffold run from a master spec."""
     cfg = load_config(config)
@@ -53,7 +55,9 @@ def run(spec, config):
 
 @cli.command()
 @click.option("--db", default="scaffold.db", help="Path to scaffold database")
-@click.option("--config", required=True, type=click.Path(exists=True), help="Path to config directory")
+@click.option(
+    "--config", required=True, type=click.Path(exists=True), help="Path to config directory"
+)
 def resume(db, config):
     """Resume an interrupted scaffold run."""
     if not Path(db).exists():
@@ -64,7 +68,9 @@ def resume(db, config):
 
 @cli.command()
 @click.option("--task", required=True, help="Task ID to respond to")
-@click.option("--choice", required=True, type=click.Choice(["Approve", "Revise", "Override", "Cancel"]))
+@click.option(
+    "--choice", required=True, type=click.Choice(["Approve", "Revise", "Override", "Cancel"])
+)
 @click.option("--db", default="scaffold.db", help="Path to scaffold database")
 def decide(task, choice, db):
     """Provide a human decision for a paused task."""
@@ -88,7 +94,8 @@ def report(db, costs, cycles, agents):
     if costs:
         rows = conn.execute("SELECT * FROM epic_costs").fetchall()
         for row in rows:
-            click.echo(f"{row['epic_title']}: {row['total_tokens_in']+row['total_tokens_out']} tokens, {row['total_runs']} runs")
+            total_tokens = row["total_tokens_in"] + row["total_tokens_out"]
+            click.echo(f"{row['epic_title']}: {total_tokens} tokens, {row['total_runs']} runs")
     if cycles:
         rows = conn.execute("SELECT * FROM cycle_hotspots").fetchall()
         for row in rows:
@@ -96,10 +103,17 @@ def report(db, costs, cycles, agents):
     if agents:
         rows = conn.execute("SELECT * FROM agent_efficiency").fetchall()
         for row in rows:
-            click.echo(f"{row['agent_role']} ({row['model']}): {row['success_rate_pct']:.0f}% success, {row['avg_ralph_iterations']:.1f} avg iterations")
+            success_rate = row["success_rate_pct"]
+            avg_iters = row["avg_ralph_iterations"]
+            msg = (
+                f"{row['agent_role']} ({row['model']}): {success_rate:.0f}% success, "
+                f"{avg_iters:.1f} avg iterations"
+            )
+            click.echo(msg)
     if not (costs or cycles or agents):
         total = conn.execute("SELECT COUNT(*) as cnt FROM tasks").fetchone()["cnt"]
-        done = conn.execute("SELECT COUNT(*) as cnt FROM tasks WHERE status='done'").fetchone()["cnt"]
+        done_query = "SELECT COUNT(*) as cnt FROM tasks WHERE status='done'"
+        done = conn.execute(done_query).fetchone()["cnt"]
         click.echo(f"Tasks: {done}/{total} done")
     conn.close()
 

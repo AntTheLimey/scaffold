@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock
+
 import pytest
+
 from orchestrator.nodes.designer import make_designer_node
 from orchestrator.state import initial_state
 
@@ -8,10 +10,12 @@ from orchestrator.state import initial_state
 def mock_client():
     client = MagicMock()
     response = MagicMock()
-    response.content = [MagicMock(
-        text="Clock component: SVG circle, 4/6/8/12 segments. "
-             "Click to fill/unfill. Animate on tick."
-    )]
+    response.content = [
+        MagicMock(
+            text="Clock component: SVG circle, 4/6/8/12 segments. "
+            "Click to fill/unfill. Animate on tick."
+        )
+    ]
     response.usage.input_tokens = 400
     response.usage.output_tokens = 200
     client.messages.create.return_value = response

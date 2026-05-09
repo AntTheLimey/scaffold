@@ -1,4 +1,4 @@
-from orchestrator.state import TaskState, initial_state
+from orchestrator.state import initial_state
 
 
 def test_initial_state_has_required_fields():

@@ -1,5 +1,7 @@
 import subprocess
+
 import pytest
+
 from orchestrator.nodes.base import DoerAgent
 
 
@@ -22,8 +24,10 @@ def test_create_worktree_reuses_existing_branch(doer, tmp_path):
         cwd=repo_path,
         capture_output=True,
         env={
-            "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "test@test.com",
-            "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@test.com",
+            "GIT_AUTHOR_NAME": "test",
+            "GIT_AUTHOR_EMAIL": "test@test.com",
+            "GIT_COMMITTER_NAME": "test",
+            "GIT_COMMITTER_EMAIL": "test@test.com",
             "HOME": str(tmp_path),
         },
     )
@@ -48,8 +52,10 @@ def test_create_worktree_reuses_existing_worktree(doer, tmp_path):
         cwd=repo_path,
         capture_output=True,
         env={
-            "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "test@test.com",
-            "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@test.com",
+            "GIT_AUTHOR_NAME": "test",
+            "GIT_AUTHOR_EMAIL": "test@test.com",
+            "GIT_COMMITTER_NAME": "test",
+            "GIT_COMMITTER_EMAIL": "test@test.com",
             "HOME": str(tmp_path),
         },
     )

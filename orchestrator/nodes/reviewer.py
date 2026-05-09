@@ -1,7 +1,6 @@
 import subprocess
 
 from orchestrator.json_utils import extract_json
-
 from orchestrator.state import TaskState
 
 REVIEW_PROMPT = (

@@ -81,11 +81,14 @@ class DoerAgent:
         if worktree_dir.exists():
             return worktree_dir
 
-        branch_exists = subprocess.run(
-            ["git", "rev-parse", "--verify", branch],
-            cwd=repo_path,
-            capture_output=True,
-        ).returncode == 0
+        branch_exists = (
+            subprocess.run(
+                ["git", "rev-parse", "--verify", branch],
+                cwd=repo_path,
+                capture_output=True,
+            ).returncode
+            == 0
+        )
 
         if branch_exists:
             subprocess.run(
@@ -121,15 +124,13 @@ class DoerAgent:
         for i in range(1, self.max_iterations + 1):
             if i > 1 and last_output:
                 current_prompt = (
-                    f"{prompt}\n\n--- PREVIOUS ATTEMPT (iteration {i-1}) ---\n"
+                    f"{prompt}\n\n--- PREVIOUS ATTEMPT (iteration {i - 1}) ---\n"
                     f"{last_output}\n--- END PREVIOUS ATTEMPT ---\n\n"
                     "The previous attempt did not complete the task. "
                     "Fix the issues and try again."
                 )
             elif failure_context:
-                current_prompt = (
-                    f"{prompt}\n\n--- FAILURE CONTEXT ---\n{failure_context}\n---"
-                )
+                current_prompt = f"{prompt}\n\n--- FAILURE CONTEXT ---\n{failure_context}\n---"
             else:
                 current_prompt = prompt
 

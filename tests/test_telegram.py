@@ -1,5 +1,7 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
+
 from orchestrator.telegram import TelegramBot
 
 
@@ -30,9 +32,7 @@ def test_send_digest(mock_post, bot):
         json=lambda: {"ok": True, "result": {"message_id": 43}},
         raise_for_status=MagicMock(),
     )
-    bot.send_digest(
-        done=5, in_progress=3, blocked=1, cost_today=2.50
-    )
+    bot.send_digest(done=5, in_progress=3, blocked=1, cost_today=2.50)
     mock_post.assert_called_once()
 
 

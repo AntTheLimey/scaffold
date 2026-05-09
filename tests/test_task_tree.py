@@ -1,5 +1,7 @@
 import json
+
 import pytest
+
 from orchestrator.task_tree import TaskTree
 
 
@@ -24,9 +26,7 @@ def test_create_task(tree):
 
 def test_create_child_task(tree):
     parent_id = tree.create(title="Core Platform", level="epic")
-    child_id = tree.create(
-        title="Auth System", level="feature", parent_id=parent_id
-    )
+    child_id = tree.create(title="Auth System", level="feature", parent_id=parent_id)
     child = tree.get(child_id)
     assert child["parent_id"] == parent_id
 

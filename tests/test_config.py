@@ -1,5 +1,4 @@
-from pathlib import Path
-from orchestrator.config import load_config, ScaffoldConfig
+from orchestrator.config import ScaffoldConfig, load_config
 
 
 def test_load_config(config_dir):

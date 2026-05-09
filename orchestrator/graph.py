@@ -1,14 +1,14 @@
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import END, START, StateGraph
 
-from orchestrator.state import TaskState
-from orchestrator.nodes.product_owner import make_product_owner_node
 from orchestrator.nodes.architect import make_architect_node
+from orchestrator.nodes.consensus import make_consensus_node
 from orchestrator.nodes.designer import make_designer_node
 from orchestrator.nodes.developer import make_developer_node
-from orchestrator.nodes.reviewer import make_reviewer_node
-from orchestrator.nodes.qa import make_qa_node
-from orchestrator.nodes.consensus import make_consensus_node
 from orchestrator.nodes.human_gate import make_human_gate_node
+from orchestrator.nodes.product_owner import make_product_owner_node
+from orchestrator.nodes.qa import make_qa_node
+from orchestrator.nodes.reviewer import make_reviewer_node
+from orchestrator.state import TaskState
 
 
 def intake_router(state: TaskState) -> str:
@@ -76,40 +76,60 @@ def build_graph(
     graph.add_node("consensus", make_consensus_node(client))
     graph.add_node("human_gate", make_human_gate_node(bot))
 
-    graph.add_conditional_edges(START, intake_router, {
-        "product_owner": "product_owner",
-        "architect": "architect",
-        "developer": "developer",
-        "human_gate": "human_gate",
-    })
+    graph.add_conditional_edges(
+        START,
+        intake_router,
+        {
+            "product_owner": "product_owner",
+            "architect": "architect",
+            "developer": "developer",
+            "human_gate": "human_gate",
+        },
+    )
 
     graph.add_edge("product_owner", "architect")
 
-    graph.add_conditional_edges("architect", architect_router, {
-        "designer": "designer",
-        "developer": "developer",
-        "human_gate": "human_gate",
-    })
+    graph.add_conditional_edges(
+        "architect",
+        architect_router,
+        {
+            "designer": "designer",
+            "developer": "developer",
+            "human_gate": "human_gate",
+        },
+    )
 
     graph.add_edge("designer", "developer")
     graph.add_edge("developer", "reviewer")
 
-    graph.add_conditional_edges("reviewer", reviewer_router, {
-        "qa": "qa",
-        "developer": "developer",
-        "human_gate": "human_gate",
-    })
+    graph.add_conditional_edges(
+        "reviewer",
+        reviewer_router,
+        {
+            "qa": "qa",
+            "developer": "developer",
+            "human_gate": "human_gate",
+        },
+    )
 
-    graph.add_conditional_edges("qa", qa_router, {
-        "__end__": END,
-        "developer": "developer",
-        "human_gate": "human_gate",
-    })
+    graph.add_conditional_edges(
+        "qa",
+        qa_router,
+        {
+            "__end__": END,
+            "developer": "developer",
+            "human_gate": "human_gate",
+        },
+    )
 
     graph.add_edge("consensus", "human_gate")
-    graph.add_conditional_edges("human_gate", human_gate_router, {
-        "developer": "developer",
-        "__end__": END,
-    })
+    graph.add_conditional_edges(
+        "human_gate",
+        human_gate_router,
+        {
+            "developer": "developer",
+            "__end__": END,
+        },
+    )
 
     return graph.compile()

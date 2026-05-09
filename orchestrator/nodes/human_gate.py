@@ -15,11 +15,13 @@ def make_human_gate_node(bot: TelegramBot):
             task_id=state["task_id"],
         )
 
-        response = interrupt({
-            "question": reason,
-            "options": options,
-            "task_id": state["task_id"],
-        })
+        response = interrupt(
+            {
+                "question": reason,
+                "options": options,
+                "task_id": state["task_id"],
+            }
+        )
 
         return {
             "verdict": response.get("choice", ""),

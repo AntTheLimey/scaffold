@@ -16,10 +16,7 @@ def make_designer_node(client):
     )
 
     def designer_node(state: TaskState) -> dict:
-        user_message = (
-            f"Create a UI/UX specification for this task.\n\n"
-            f"Task: {state['task_id']}\n"
-        )
+        user_message = f"Create a UI/UX specification for this task.\n\nTask: {state['task_id']}\n"
         result = agent.call(system_prompt=SYSTEM_PROMPT, user_message=user_message)
         return {"agent_output": result.text}
 

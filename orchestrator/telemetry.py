@@ -1,7 +1,7 @@
 import json
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 class Telemetry:
@@ -71,12 +71,19 @@ class Telemetry:
         token_out: int | None = None,
         output: dict | None = None,
     ) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         self.conn.execute(
             "UPDATE agent_runs SET finished_at = ?, outcome = ?, iterations = ?, "
             "token_in = ?, token_out = ?, output = ? WHERE id = ?",
-            (now, outcome, iterations, token_in, token_out,
-             json.dumps(output) if output else None, run_id),
+            (
+                now,
+                outcome,
+                iterations,
+                token_in,
+                token_out,
+                json.dumps(output) if output else None,
+                run_id,
+            ),
         )
         self.conn.commit()
 

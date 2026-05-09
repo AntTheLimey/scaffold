@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from orchestrator.json_utils import extract_json
-
 from orchestrator.nodes.base import AdvisorAgent
 from orchestrator.state import TaskState
 

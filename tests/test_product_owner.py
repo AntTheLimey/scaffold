@@ -1,6 +1,8 @@
 import json
 from unittest.mock import MagicMock
+
 import pytest
+
 from orchestrator.nodes.product_owner import make_product_owner_node
 from orchestrator.state import initial_state
 
@@ -9,14 +11,28 @@ from orchestrator.state import initial_state
 def mock_client():
     client = MagicMock()
     response = MagicMock()
-    response.content = [MagicMock(text=json.dumps({
-        "children": [
-            {"title": "Auth System", "level": "feature",
-             "spec_ref": "Section 2", "acceptance": ["JWT works"]},
-            {"title": "WebSocket Server", "level": "feature",
-             "spec_ref": "Section 10", "acceptance": ["Clients connect"]},
-        ]
-    }))]
+    response.content = [
+        MagicMock(
+            text=json.dumps(
+                {
+                    "children": [
+                        {
+                            "title": "Auth System",
+                            "level": "feature",
+                            "spec_ref": "Section 2",
+                            "acceptance": ["JWT works"],
+                        },
+                        {
+                            "title": "WebSocket Server",
+                            "level": "feature",
+                            "spec_ref": "Section 10",
+                            "acceptance": ["Clients connect"],
+                        },
+                    ]
+                }
+            )
+        )
+    ]
     response.usage.input_tokens = 800
     response.usage.output_tokens = 300
     client.messages.create.return_value = response

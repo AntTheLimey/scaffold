@@ -1,6 +1,8 @@
-from unittest.mock import patch, MagicMock
 import subprocess
+from unittest.mock import MagicMock, patch
+
 import pytest
+
 from orchestrator.nodes.base import DoerAgent
 
 
@@ -22,9 +24,13 @@ def test_doer_creates_worktree(doer, tmp_path):
         ["git", "commit", "--allow-empty", "-m", "init"],
         cwd=repo_path,
         capture_output=True,
-        env={"GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "test@test.com",
-             "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@test.com",
-             "HOME": str(tmp_path)},
+        env={
+            "GIT_AUTHOR_NAME": "test",
+            "GIT_AUTHOR_EMAIL": "test@test.com",
+            "GIT_COMMITTER_NAME": "test",
+            "GIT_COMMITTER_EMAIL": "test@test.com",
+            "HOME": str(tmp_path),
+        },
     )
     worktree_path = doer.create_worktree(repo_path, "scaffold/core/auth")
     assert worktree_path.exists()
@@ -50,9 +56,7 @@ def test_doer_ralph_loop_succeeds_first_try(mock_run, doer):
 @patch("orchestrator.nodes.base.subprocess.run")
 def test_doer_ralph_loop_retries_on_no_promise(mock_run, doer):
     no_promise = MagicMock(stdout="Still working...", stderr="", returncode=0)
-    with_promise = MagicMock(
-        stdout="Fixed it.\nTASK COMPLETE", stderr="", returncode=0
-    )
+    with_promise = MagicMock(stdout="Fixed it.\nTASK COMPLETE", stderr="", returncode=0)
     mock_run.side_effect = [no_promise, with_promise]
     result = doer.ralph_loop(
         worktree_path="/tmp/worktree",
@@ -77,9 +81,7 @@ def test_doer_ralph_loop_hits_max_iterations(mock_run, doer):
 @patch("orchestrator.nodes.base.subprocess.run")
 def test_doer_injects_failure_context_on_retry(mock_run, doer):
     no_promise = MagicMock(stdout="Error: module not found", stderr="", returncode=1)
-    with_promise = MagicMock(
-        stdout="Fixed.\nTASK COMPLETE", stderr="", returncode=0
-    )
+    with_promise = MagicMock(stdout="Fixed.\nTASK COMPLETE", stderr="", returncode=0)
     mock_run.side_effect = [no_promise, with_promise]
     doer.ralph_loop(worktree_path="/tmp/wt", prompt="Implement auth")
     second_call = mock_run.call_args_list[1]

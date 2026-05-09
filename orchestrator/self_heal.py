@@ -34,8 +34,7 @@ class SelfHealer:
     def check_epic(self, epic_id: str) -> dict | None:
         conn = self.telemetry.conn
         row = conn.execute(
-            "SELECT COUNT(*) as cnt FROM tasks "
-            "WHERE parent_id = ? AND status = 'stuck'",
+            "SELECT COUNT(*) as cnt FROM tasks WHERE parent_id = ? AND status = 'stuck'",
             (epic_id,),
         ).fetchone()
         if row["cnt"] >= 3:

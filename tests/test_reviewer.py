@@ -1,6 +1,6 @@
 import json
-from unittest.mock import patch, MagicMock
-import pytest
+from unittest.mock import MagicMock, patch
+
 from orchestrator.nodes.reviewer import make_reviewer_node
 from orchestrator.state import initial_state
 
@@ -27,10 +27,9 @@ def test_reviewer_approves(mock_run):
 @patch("orchestrator.nodes.reviewer.subprocess.run")
 def test_reviewer_requests_revision(mock_run):
     mock_run.return_value = MagicMock(
-        stdout=json.dumps({
-            "verdict": "revise",
-            "feedback": "Missing input validation on invite code endpoint."
-        }),
+        stdout=json.dumps(
+            {"verdict": "revise", "feedback": "Missing input validation on invite code endpoint."}
+        ),
         stderr="",
         returncode=0,
     )

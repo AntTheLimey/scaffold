@@ -1,5 +1,7 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
 import pytest
+
 from orchestrator.nodes.base import AdvisorAgent
 
 

@@ -1,6 +1,6 @@
 import json
 from unittest.mock import MagicMock
-import pytest
+
 from orchestrator.nodes.consensus import make_consensus_node
 from orchestrator.state import initial_state
 
@@ -19,11 +19,13 @@ def make_mock_client(responses: list[str]):
 
 
 def test_consensus_resolves_on_concession():
-    client = make_mock_client([
-        json.dumps({"position": "Use REST", "concedes": False}),
-        json.dumps({"position": "Use GraphQL", "concedes": False}),
-        json.dumps({"position": "REST is fine", "concedes": True}),
-    ])
+    client = make_mock_client(
+        [
+            json.dumps({"position": "Use REST", "concedes": False}),
+            json.dumps({"position": "Use GraphQL", "concedes": False}),
+            json.dumps({"position": "REST is fine", "concedes": True}),
+        ]
+    )
     node_fn = make_consensus_node(client)
     state = initial_state(task_id="task-001", level="task")
     result = node_fn(state)
@@ -32,12 +34,14 @@ def test_consensus_resolves_on_concession():
 
 
 def test_consensus_escalates_on_deadlock():
-    client = make_mock_client([
-        json.dumps({"position": "Use REST", "concedes": False}),
-        json.dumps({"position": "Use GraphQL", "concedes": False}),
-        json.dumps({"position": "Still REST", "concedes": False}),
-        json.dumps({"position": "Still GraphQL", "concedes": False}),
-    ])
+    client = make_mock_client(
+        [
+            json.dumps({"position": "Use REST", "concedes": False}),
+            json.dumps({"position": "Use GraphQL", "concedes": False}),
+            json.dumps({"position": "Still REST", "concedes": False}),
+            json.dumps({"position": "Still GraphQL", "concedes": False}),
+        ]
+    )
     node_fn = make_consensus_node(client)
     state = initial_state(task_id="task-001", level="task")
     result = node_fn(state)

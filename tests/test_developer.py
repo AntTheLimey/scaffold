@@ -1,7 +1,9 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
-from orchestrator.nodes.developer import make_developer_node
+
 from orchestrator.nodes.base import RalphResult
+from orchestrator.nodes.developer import make_developer_node
 from orchestrator.state import initial_state
 
 
@@ -55,4 +57,5 @@ def test_developer_injects_failure_context_on_retry(mock_doer):
     state["feedback"] = "Missing error handling in auth middleware."
     node_fn(state)
     call_args = mock_doer.ralph_loop.call_args
-    assert "Missing error handling" in call_args.kwargs.get("failure_context", call_args.kwargs.get("prompt", ""))
+    context = call_args.kwargs.get("failure_context", call_args.kwargs.get("prompt", ""))
+    assert "Missing error handling" in context

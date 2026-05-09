@@ -1,6 +1,8 @@
 import json
 from unittest.mock import MagicMock
+
 import pytest
+
 from orchestrator.nodes.architect import make_architect_node
 from orchestrator.state import initial_state
 
@@ -9,15 +11,24 @@ from orchestrator.state import initial_state
 def mock_client():
     client = MagicMock()
     response = MagicMock()
-    response.content = [MagicMock(text=json.dumps({
-        "technical_design": "Use JWT with httpOnly cookies. chi middleware.",
-        "has_ui_component": False,
-        "children": [
-            {"title": "Auth middleware", "level": "task",
-             "spec_ref": "Section 2.1",
-             "acceptance": ["JWT validates", "Expired tokens rejected"]},
-        ]
-    }))]
+    response.content = [
+        MagicMock(
+            text=json.dumps(
+                {
+                    "technical_design": "Use JWT with httpOnly cookies. chi middleware.",
+                    "has_ui_component": False,
+                    "children": [
+                        {
+                            "title": "Auth middleware",
+                            "level": "task",
+                            "spec_ref": "Section 2.1",
+                            "acceptance": ["JWT validates", "Expired tokens rejected"],
+                        },
+                    ],
+                }
+            )
+        )
+    ]
     response.usage.input_tokens = 600
     response.usage.output_tokens = 400
     client.messages.create.return_value = response
@@ -34,11 +45,17 @@ def test_architect_produces_design(mock_client):
 
 def test_architect_detects_ui_component(mock_client):
     response = MagicMock()
-    response.content = [MagicMock(text=json.dumps({
-        "technical_design": "React component with clock SVG",
-        "has_ui_component": True,
-        "children": [],
-    }))]
+    response.content = [
+        MagicMock(
+            text=json.dumps(
+                {
+                    "technical_design": "React component with clock SVG",
+                    "has_ui_component": True,
+                    "children": [],
+                }
+            )
+        )
+    ]
     response.usage.input_tokens = 500
     response.usage.output_tokens = 300
     mock_client.messages.create.return_value = response

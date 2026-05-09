@@ -1,4 +1,5 @@
 import pytest
+
 from orchestrator.self_heal import SelfHealer
 from orchestrator.telemetry import Telemetry
 
@@ -19,7 +20,7 @@ def test_detect_stuck_loop(healer, db, telemetry):
         "INSERT INTO tasks (id, level, status, title) VALUES ('t1', 'task', 'in_progress', 'T1')"
     )
     db.commit()
-    for i in range(4):
+    for _ in range(4):
         telemetry.log(
             task_id="t1",
             event_type="task.cycle",
@@ -66,7 +67,7 @@ def test_detect_review_ping_pong(healer, db, telemetry):
         "INSERT INTO tasks (id, level, status, title) VALUES ('t1', 'task', 'in_progress', 'T1')"
     )
     db.commit()
-    for i in range(3):
+    for _ in range(3):
         telemetry.log(
             task_id="t1",
             event_type="task.cycle",
@@ -81,7 +82,7 @@ def test_detect_bug_cycle_escalation(healer, db, telemetry):
         "INSERT INTO tasks (id, level, status, title) VALUES ('t1', 'task', 'in_progress', 'T1')"
     )
     db.commit()
-    for i in range(4):
+    for _ in range(4):
         telemetry.log(
             task_id="t1",
             event_type="task.cycle",
