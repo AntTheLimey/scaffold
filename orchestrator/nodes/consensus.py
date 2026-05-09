@@ -29,12 +29,14 @@ def make_consensus_node(client):
                     )
                 result = agent.call(system_prompt=SYSTEM_PROMPT, user_message=prompt)
                 parsed = extract_json(result.text)
-                positions.append(f"{party}: {parsed['position']}")
+                if not parsed:
+                    continue
+                positions.append(f"{party}: {parsed.get('position', '')}")
                 if parsed.get("concedes", False):
                     return {
                         "verdict": "resolved",
                         "escalation_reason": None,
-                        "agent_output": f"Resolved in round {round_num + 1}: {party} concedes. {parsed['position']}",
+                        "agent_output": f"Resolved in round {round_num + 1}: {party} concedes. {parsed.get('position', '')}",
                     }
 
         return {
