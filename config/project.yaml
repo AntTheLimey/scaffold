@@ -1,0 +1,7 @@
+repo_path: /Users/antonypegg/PROJECTS/inkwell
+branch_prefix: scaffold
+max_concurrent_agents: 3
+telegram_bot_token: ""
+telegram_chat_id: ""
+db_path: scaffold.db
+spec_path: /Users/antonypegg/PROJECTS/inkwell/docs/design/2026-05-08-inkwell-vtt-master-spec.md

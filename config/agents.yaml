@@ -1,0 +1,29 @@
+roles:
+  product_owner:
+    model: claude-opus-4-20250514
+    execution: api
+  architect:
+    model: claude-opus-4-20250514
+    execution: api
+  designer:
+    model: claude-sonnet-4-20250514
+    execution: api
+  developer:
+    model: claude-sonnet-4-20250514
+    execution: cli
+    max_iterations: 10
+    completion_promise: "TASK COMPLETE"
+  reviewer:
+    model: claude-sonnet-4-20250514
+    execution: cli
+  qa:
+    model: claude-sonnet-4-20250514
+    execution: cli
+    max_iterations: 8
+    completion_promise: "TESTS PASSING"
+
+escalation:
+  stuck_loop_model: claude-opus-4-20250514
+  max_review_cycles: 3
+  max_bug_cycles: 3
+  cost_threshold_per_run: 5.00

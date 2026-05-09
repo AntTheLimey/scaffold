@@ -1,0 +1,57 @@
+rapid:
+  product_scope:
+    recommend: product_owner
+    agree: architect
+    perform: developer
+    input: [designer, qa]
+    decide: human
+  architecture:
+    recommend: architect
+    agree: reviewer
+    perform: developer
+    input: [designer]
+    decide: architect
+  ui_ux:
+    recommend: designer
+    agree: product_owner
+    perform: developer
+    input: [architect]
+    decide: designer
+  data_model:
+    recommend: architect
+    agree: product_owner
+    perform: developer
+    input: [qa]
+    decide: architect
+  priority:
+    recommend: product_owner
+    agree: architect
+    perform: orchestrator
+    decide: product_owner
+
+raci:
+  write_code:
+    responsible: developer
+    accountable: reviewer
+    consulted: [architect]
+    informed: [product_owner, qa]
+  code_review:
+    responsible: reviewer
+    accountable: architect
+    consulted: [developer]
+    informed: [product_owner]
+  write_tests:
+    responsible: qa
+    accountable: reviewer
+    consulted: [developer]
+    informed: [product_owner]
+  merge:
+    responsible: orchestrator
+    accountable: reviewer
+    consulted: [developer]
+    informed: [product_owner, qa, architect, designer]
+  bug_fix:
+    responsible: developer
+    accountable: qa
+    consulted: [reviewer]
+    informed: [product_owner]
