@@ -15,7 +15,7 @@ def make_workflow_agent(
     agent_dir.mkdir(parents=True, exist_ok=True)
     (agent_dir / "agent.md").write_text(f"# {role} agent")
     if kb_files:
-        kb_dir = agent_dir / "kb"
+        kb_dir = agent_dir / "knowledge-base"
         kb_dir.mkdir(exist_ok=True)
         for name, content in kb_files.items():
             (kb_dir / name).write_text(content)
@@ -27,7 +27,7 @@ def make_specialist(agents_dir: Path, name: str, kb_files: dict[str, str] | None
     agent_dir.mkdir(parents=True, exist_ok=True)
     (agent_dir / "agent.md").write_text(f"# {name} specialist")
     if kb_files:
-        kb_dir = agent_dir / "kb"
+        kb_dir = agent_dir / "knowledge-base"
         kb_dir.mkdir(exist_ok=True)
         for name_f, content in kb_files.items():
             (kb_dir / name_f).write_text(content)

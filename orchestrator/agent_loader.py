@@ -27,7 +27,7 @@ class AgentLoader:
             return ""
 
         sections = [agent_md.read_text()]
-        kb_dir = agent_dir / "kb"
+        kb_dir = agent_dir / "knowledge-base"
         if kb_dir.is_dir():
             for kb_file in sorted(kb_dir.iterdir()):
                 if kb_file.is_file():
@@ -51,7 +51,7 @@ class AgentLoader:
 
         sections = [agent_md.read_text()]
 
-        kb_dir = agent_dir / "kb"
+        kb_dir = agent_dir / "knowledge-base"
         if kb_dir.is_dir():
             selected = self._select_knowledge_bases(kb_dir, task_context)
             for kb_file in selected:
