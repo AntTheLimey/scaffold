@@ -28,6 +28,7 @@ def test_developer_runs_ralph_loop(mock_doer):
     assert result["status"] == "in_review"
     assert result["verdict"] == ""
     mock_doer.ralph_loop.assert_called_once()
+    mock_doer.cleanup_worktree.assert_called_once()
 
 
 def test_developer_marks_stuck_on_failure(mock_doer):

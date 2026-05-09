@@ -77,12 +77,30 @@ class DoerAgent:
     def create_worktree(self, repo_path: Path | str, branch: str) -> Path:
         repo_path = Path(repo_path)
         worktree_dir = repo_path.parent / f".worktrees/{branch.replace('/', '-')}"
-        subprocess.run(
-            ["git", "worktree", "add", "-b", branch, str(worktree_dir)],
+
+        if worktree_dir.exists():
+            return worktree_dir
+
+        branch_exists = subprocess.run(
+            ["git", "rev-parse", "--verify", branch],
             cwd=repo_path,
             capture_output=True,
-            check=True,
-        )
+        ).returncode == 0
+
+        if branch_exists:
+            subprocess.run(
+                ["git", "worktree", "add", str(worktree_dir), branch],
+                cwd=repo_path,
+                capture_output=True,
+                check=True,
+            )
+        else:
+            subprocess.run(
+                ["git", "worktree", "add", "-b", branch, str(worktree_dir)],
+                cwd=repo_path,
+                capture_output=True,
+                check=True,
+            )
         return worktree_dir
 
     def cleanup_worktree(self, repo_path: Path | str, worktree_path: Path | str) -> None:

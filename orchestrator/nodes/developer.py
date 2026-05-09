@@ -27,11 +27,14 @@ def make_developer_node(repo_path: str, branch_prefix: str, model: str):
             )
             prompt += f"\n\nReview feedback to address:\n{state['feedback']}"
 
-        result = doer.ralph_loop(
-            worktree_path=worktree_path,
-            prompt=prompt,
-            failure_context=failure_context,
-        )
+        try:
+            result = doer.ralph_loop(
+                worktree_path=worktree_path,
+                prompt=prompt,
+                failure_context=failure_context,
+            )
+        finally:
+            doer.cleanup_worktree(repo_path, worktree_path)
 
         if result.success:
             return {

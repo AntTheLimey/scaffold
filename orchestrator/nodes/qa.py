@@ -2,7 +2,7 @@ from orchestrator.nodes.base import DoerAgent
 from orchestrator.state import TaskState
 
 
-def make_qa_node(repo_path: str, model: str):
+def make_qa_node(repo_path: str, branch_prefix: str, model: str):
     def qa_node(state: TaskState) -> dict:
         doer = DoerAgent(
             role="qa",
@@ -11,7 +11,7 @@ def make_qa_node(repo_path: str, model: str):
             completion_promise="TESTS PASSING",
         )
 
-        branch = f"scaffold/{state['task_id']}"
+        branch = f"{branch_prefix}/{state['task_id']}"
         worktree_path = doer.create_worktree(repo_path, branch)
 
         prompt = (
@@ -20,7 +20,10 @@ def make_qa_node(repo_path: str, model: str):
             f"Task: {state['task_id']}\n"
         )
 
-        result = doer.ralph_loop(worktree_path=worktree_path, prompt=prompt)
+        try:
+            result = doer.ralph_loop(worktree_path=worktree_path, prompt=prompt)
+        finally:
+            doer.cleanup_worktree(repo_path, worktree_path)
 
         if result.success:
             return {

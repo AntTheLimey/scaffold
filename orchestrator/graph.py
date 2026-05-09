@@ -65,7 +65,7 @@ def build_graph(
     graph.add_node("designer", make_designer_node(client))
     graph.add_node("developer", make_developer_node(repo_path, branch_prefix, model))
     graph.add_node("reviewer", make_reviewer_node(repo_path, branch_prefix, model))
-    graph.add_node("qa", make_qa_node(repo_path, model))
+    graph.add_node("qa", make_qa_node(repo_path, branch_prefix, model))
     graph.add_node("consensus", make_consensus_node(client))
     graph.add_node("human_gate", make_human_gate_node(bot))
 
