@@ -16,6 +16,7 @@ def test_cli_help(runner):
     assert result.exit_code == 0
     assert "run" in result.output
     assert "report" in result.output
+    assert "preflight" in result.output
 
 
 def test_cli_report_no_db(runner, tmp_path):
@@ -35,7 +36,10 @@ def test_cli_run_builds_graph(runner, tmp_path, config_dir):
         patch("orchestrator.__main__.build_graph") as mock_build,
         patch("orchestrator.__main__.TelegramBot"),
         patch("orchestrator.__main__.SqliteSaver"),
+        patch("orchestrator.__main__.AgentLoader"),
+        patch("orchestrator.__main__.run_preflight") as mock_preflight,
     ):
+        mock_preflight.return_value.ok = True
         mock_graph = MagicMock()
         mock_build.return_value = mock_graph
         result = runner.invoke(
@@ -53,7 +57,10 @@ def test_cli_run_passes_checkpointer_to_build_graph(runner, tmp_path, config_dir
         patch("orchestrator.__main__.build_graph") as mock_build,
         patch("orchestrator.__main__.TelegramBot"),
         patch("orchestrator.__main__.SqliteSaver") as MockSaver,
+        patch("orchestrator.__main__.AgentLoader"),
+        patch("orchestrator.__main__.run_preflight") as mock_preflight,
     ):
+        mock_preflight.return_value.ok = True
         mock_checkpointer = MagicMock()
         MockSaver.from_conn_string.return_value.__enter__ = MagicMock(
             return_value=mock_checkpointer
@@ -78,7 +85,10 @@ def test_cli_run_closes_bot(runner, tmp_path, config_dir):
         patch("orchestrator.__main__.build_graph") as mock_build,
         patch("orchestrator.__main__.TelegramBot") as MockBot,
         patch("orchestrator.__main__.SqliteSaver"),
+        patch("orchestrator.__main__.AgentLoader"),
+        patch("orchestrator.__main__.run_preflight") as mock_preflight,
     ):
+        mock_preflight.return_value.ok = True
         mock_bot = MagicMock()
         MockBot.return_value = mock_bot
         mock_graph = MagicMock()
@@ -102,6 +112,7 @@ def test_cli_decide_invokes_with_command(runner, tmp_path, config_dir):
         patch("orchestrator.__main__.build_graph") as mock_build,
         patch("orchestrator.__main__.TelegramBot"),
         patch("orchestrator.__main__.SqliteSaver"),
+        patch("orchestrator.__main__.AgentLoader"),
     ):
         mock_graph = MagicMock()
         mock_graph.invoke.return_value = {"status": "done"}
@@ -136,6 +147,7 @@ def test_cli_decide_closes_bot(runner, tmp_path, config_dir):
         patch("orchestrator.__main__.build_graph") as mock_build,
         patch("orchestrator.__main__.TelegramBot") as MockBot,
         patch("orchestrator.__main__.SqliteSaver"),
+        patch("orchestrator.__main__.AgentLoader"),
     ):
         mock_bot = MagicMock()
         MockBot.return_value = mock_bot
@@ -167,6 +179,7 @@ def test_cli_resume_invokes_graph(runner, tmp_path, config_dir):
         patch("orchestrator.__main__.build_graph") as mock_build,
         patch("orchestrator.__main__.TelegramBot"),
         patch("orchestrator.__main__.SqliteSaver"),
+        patch("orchestrator.__main__.AgentLoader"),
     ):
         mock_graph = MagicMock()
         mock_graph.invoke.return_value = {"status": "done"}
@@ -206,3 +219,27 @@ def test_cli_resume_no_db(runner, tmp_path, config_dir):
         ],
     )
     assert result.exit_code != 0 or "No database" in result.output
+
+
+def test_cli_preflight_command(runner, config_dir):
+    with patch("orchestrator.__main__.run_preflight") as mock_preflight:
+        mock_result = MagicMock()
+        mock_result.ok = True
+        mock_result.checks = []
+        mock_preflight.return_value = mock_result
+        result = runner.invoke(cli, ["preflight", "--config", str(config_dir)])
+        assert result.exit_code == 0
+        assert "Ready to run" in result.output
+
+
+def test_cli_preflight_fails_when_checks_fail(runner, config_dir):
+    with patch("orchestrator.__main__.run_preflight") as mock_preflight:
+        from orchestrator.preflight import Check
+
+        mock_result = MagicMock()
+        mock_result.ok = False
+        mock_result.checks = [Check(name="ANTHROPIC_API_KEY", passed=False, status="FAIL")]
+        mock_preflight.return_value = mock_result
+        result = runner.invoke(cli, ["preflight", "--config", str(config_dir)])
+        assert result.exit_code != 0
+        assert "Preflight failed" in result.output

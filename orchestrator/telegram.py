@@ -23,6 +23,8 @@ class TelegramBot:
         self.close()
 
     def send_escalation(self, question: str, options: list[str], task_id: str) -> int:
+        if not self.token:
+            return 0
         keyboard = {
             "inline_keyboard": [
                 [{"text": opt, "callback_data": json.dumps({"task": task_id, "choice": opt})}]
@@ -42,6 +44,8 @@ class TelegramBot:
         return resp.json()["result"]["message_id"]
 
     def send_digest(self, done: int, in_progress: int, blocked: int, cost_today: float) -> None:
+        if not self.token:
+            return
         text = (
             f"Status Digest\n\n"
             f"Done: {done}\n"
@@ -56,6 +60,8 @@ class TelegramBot:
         resp.raise_for_status()
 
     def poll_for_callback(self, timeout: int = 300) -> dict | None:
+        if not self.token:
+            return None
         resp = self.client.post(
             f"{self.base_url}/getUpdates",
             json={

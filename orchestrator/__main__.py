@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import anthropic
@@ -10,6 +11,7 @@ from orchestrator.agent_loader import AgentLoader
 from orchestrator.config import load_config
 from orchestrator.db import get_connection, init_db
 from orchestrator.graph import build_graph
+from orchestrator.preflight import run_preflight
 from orchestrator.state import initial_state
 from orchestrator.task_tree import TaskTree
 from orchestrator.telegram import TelegramBot
@@ -24,7 +26,10 @@ def _checkpoint_path(db_path: str) -> str:
 
 def _build_scaffold(cfg, spec_path: str, checkpointer):
     client = anthropic.Anthropic()
-    bot = TelegramBot(token="", chat_id="")
+    bot = TelegramBot(
+        token=os.environ.get("TELEGRAM_BOT_TOKEN", ""),
+        chat_id=os.environ.get("TELEGRAM_CHAT_ID", ""),
+    )
     agents_dir = Path(__file__).parent / "agents"
     agent_loader = AgentLoader(agents_dir)
     graph = build_graph(
@@ -54,6 +59,12 @@ def cli():
 def run(spec, config):
     """Start a new scaffold run from a master spec."""
     cfg = load_config(config)
+    preflight_result = run_preflight(cfg)
+    if not preflight_result.ok:
+        for check in preflight_result.checks:
+            click.echo(f"  {check.name} {'.' * (30 - len(check.name))} {check.status}")
+        click.echo("\nPreflight failed. Fix the issues above and try again.")
+        raise SystemExit(1)
     conn = init_db(cfg.project.db_path)
 
     with SqliteSaver.from_conn_string(_checkpoint_path(cfg.project.db_path)) as checkpointer:
@@ -129,6 +140,25 @@ def decide(task, choice, db, config, spec):
             click.echo(f"Status: {result.get('status', 'unknown')}")
         finally:
             bot.close()
+
+
+@cli.command()
+@click.option(
+    "--config", required=True, type=click.Path(exists=True), help="Path to config directory"
+)
+def preflight(config):
+    """Validate scaffold prerequisites."""
+    cfg = load_config(config)
+    result = run_preflight(cfg)
+    click.echo("\nPreflight Check")
+    for check in result.checks:
+        padding = "." * (30 - len(check.name))
+        click.echo(f"  {check.name} {padding} {check.status}")
+    if result.ok:
+        click.echo("\nReady to run.")
+    else:
+        click.echo("\nPreflight failed.")
+        raise SystemExit(1)
 
 
 @cli.command()
