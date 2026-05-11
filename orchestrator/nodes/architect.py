@@ -12,10 +12,10 @@ SYSTEM_PROMPT = (
 )
 
 
-def make_architect_node(client, agent_loader: AgentLoader):
+def make_architect_node(client, agent_loader: AgentLoader, model: str = "claude-opus-4-6"):
     agent = AdvisorAgent(
         role="architect",
-        model="claude-opus-4-6",
+        model=model,
         client=client,
     )
 

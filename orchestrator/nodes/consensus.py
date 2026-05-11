@@ -12,10 +12,10 @@ SYSTEM_PROMPT = (
 MAX_ROUNDS = 2
 
 
-def make_consensus_node(client, agent_loader: AgentLoader):
+def make_consensus_node(client, agent_loader: AgentLoader, model: str = "claude-opus-4-6"):
     agent = AdvisorAgent(
         role="consensus",
-        model="claude-opus-4-6",
+        model=model,
         client=client,
     )
 

@@ -92,6 +92,32 @@ def test_developer_dispatches_correct_specialist(
     )
 
 
+def test_developer_matches_specialist_by_file_type(
+    mock_doer, mock_advisor, agent_loader, agents_config
+):
+    """Developer picks the roster specialist matching the task's file types, not just [0]."""
+    agent_loader.detect_specialist.return_value = "react-expert"
+
+    node_fn = make_developer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        agent_loader=agent_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-003", level="task")
+    state["specialists"] = ["python-expert", "react-expert"]
+    state["agent_output"] = "Update src/components/Header.tsx"
+
+    node_fn(state)
+
+    mock_doer.assert_called_once_with(
+        role="react-expert",
+        model="claude-sonnet-4-6",
+        max_iterations=8,
+        completion_promise="TASK COMPLETE",
+    )
+
+
 def test_developer_detects_specialist_from_agent_output(
     mock_doer, mock_advisor, agent_loader, agents_config
 ):

@@ -74,25 +74,45 @@ def build_graph(
 ):
     graph = StateGraph(TaskState)
 
-    reviewer_model = agents_config.workflow.get("reviewer", {}).get("model", "claude-sonnet-4-6")
-    qa_model = agents_config.workflow.get("qa", {}).get("model", "claude-sonnet-4-6")
+    def _model(role: str, default: str) -> str:
+        return agents_config.workflow.get(role, {}).get("model", default)
 
     graph.add_node(
         "onboarding",
         make_onboarding_node(repo_path, Path(agent_loader.agents_dir)),
     )
-    graph.add_node("product_owner", make_product_owner_node(client, spec_path, agent_loader))
-    graph.add_node("architect", make_architect_node(client, agent_loader))
-    graph.add_node("designer", make_designer_node(client, agent_loader))
+    po_model = _model("product_owner", "claude-opus-4-6")
+    graph.add_node(
+        "product_owner",
+        make_product_owner_node(client, spec_path, agent_loader, po_model),
+    )
+    graph.add_node(
+        "architect",
+        make_architect_node(client, agent_loader, _model("architect", "claude-opus-4-6")),
+    )
+    graph.add_node(
+        "designer",
+        make_designer_node(client, agent_loader, _model("designer", "claude-sonnet-4-6")),
+    )
     graph.add_node(
         "developer",
         make_developer_node(repo_path, branch_prefix, agent_loader, agents_config, client),
     )
+    reviewer_model = _model("reviewer", "claude-sonnet-4-6")
     graph.add_node(
-        "reviewer", make_reviewer_node(repo_path, branch_prefix, reviewer_model, agent_loader)
+        "reviewer",
+        make_reviewer_node(repo_path, branch_prefix, reviewer_model, agent_loader),
     )
-    graph.add_node("qa", make_qa_node(repo_path, branch_prefix, qa_model, agent_loader))
-    graph.add_node("consensus", make_consensus_node(client, agent_loader))
+    qa_model = _model("qa", "claude-sonnet-4-6")
+    graph.add_node(
+        "qa",
+        make_qa_node(repo_path, branch_prefix, qa_model, agent_loader),
+    )
+    consensus_model = _model("consensus", "claude-opus-4-6")
+    graph.add_node(
+        "consensus",
+        make_consensus_node(client, agent_loader, consensus_model),
+    )
     graph.add_node("human_gate", make_human_gate_node(bot))
 
     graph.add_edge(START, "onboarding")

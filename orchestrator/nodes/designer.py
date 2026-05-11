@@ -9,10 +9,10 @@ SYSTEM_PROMPT = (
 )
 
 
-def make_designer_node(client, agent_loader: AgentLoader):
+def make_designer_node(client, agent_loader: AgentLoader, model: str = "claude-sonnet-4-6"):
     agent = AdvisorAgent(
         role="designer",
-        model="claude-sonnet-4-6",
+        model=model,
         client=client,
     )
 

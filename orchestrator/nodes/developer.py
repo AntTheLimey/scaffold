@@ -29,13 +29,15 @@ def make_developer_node(
         # 2. Extract file paths from agent_output
         file_paths = _extract_file_paths(agent_output)
 
-        # 3. Select specialist
-        if specialist_names:
+        # 3. Select specialist — match file types against roster
+        specialist_name = ""
+        detected = agent_loader.detect_specialist(file_paths) if file_paths else ""
+        if detected and (not specialist_names or detected in specialist_names):
+            specialist_name = detected
+        if not specialist_name and specialist_names:
             specialist_name = specialist_names[0]
-        else:
-            specialist_name = agent_loader.detect_specialist(file_paths)
-            if not specialist_name:
-                specialist_name = "python-expert"
+        if not specialist_name:
+            specialist_name = "python-expert"
 
         # 4. Get specialist config
         spec_config = agents_config.specialists[specialist_name]

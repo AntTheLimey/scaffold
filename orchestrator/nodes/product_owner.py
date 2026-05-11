@@ -16,10 +16,12 @@ SYSTEM_PROMPT = (
 )
 
 
-def make_product_owner_node(client, spec_path: str, agent_loader: AgentLoader):
+def make_product_owner_node(
+    client, spec_path: str, agent_loader: AgentLoader, model: str = "claude-opus-4-6"
+):
     agent = AdvisorAgent(
         role="product_owner",
-        model="claude-opus-4-6",
+        model=model,
         client=client,
     )
 
