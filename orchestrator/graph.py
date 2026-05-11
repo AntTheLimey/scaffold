@@ -81,8 +81,8 @@ def build_graph(
         "developer",
         make_developer_node(repo_path, branch_prefix, agent_loader, agents_config, client),
     )
-    graph.add_node("reviewer", make_reviewer_node(repo_path, branch_prefix, model))
-    graph.add_node("qa", make_qa_node(repo_path, branch_prefix, model))
+    graph.add_node("reviewer", make_reviewer_node(repo_path, branch_prefix, model, agent_loader))
+    graph.add_node("qa", make_qa_node(repo_path, branch_prefix, model, agent_loader))
     graph.add_node("consensus", make_consensus_node(client))
     graph.add_node("human_gate", make_human_gate_node(bot))
 
