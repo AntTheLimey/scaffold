@@ -1,5 +1,7 @@
 from langgraph.graph import END, START, StateGraph
 
+from orchestrator.agent_loader import AgentLoader
+from orchestrator.config import AgentsConfig
 from orchestrator.nodes.architect import make_architect_node
 from orchestrator.nodes.consensus import make_consensus_node
 from orchestrator.nodes.designer import make_designer_node
@@ -64,6 +66,8 @@ def build_graph(
     branch_prefix: str,
     spec_path: str,
     model: str,
+    agent_loader: AgentLoader | None = None,
+    agents_config: AgentsConfig | None = None,
     checkpointer=None,
 ):
     graph = StateGraph(TaskState)
@@ -71,7 +75,12 @@ def build_graph(
     graph.add_node("product_owner", make_product_owner_node(client, spec_path))
     graph.add_node("architect", make_architect_node(client))
     graph.add_node("designer", make_designer_node(client))
-    graph.add_node("developer", make_developer_node(repo_path, branch_prefix, model))
+    assert agent_loader is not None, "agent_loader is required"
+    assert agents_config is not None, "agents_config is required"
+    graph.add_node(
+        "developer",
+        make_developer_node(repo_path, branch_prefix, agent_loader, agents_config, client),
+    )
     graph.add_node("reviewer", make_reviewer_node(repo_path, branch_prefix, model))
     graph.add_node("qa", make_qa_node(repo_path, branch_prefix, model))
     graph.add_node("consensus", make_consensus_node(client))

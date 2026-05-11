@@ -8,6 +8,15 @@ from orchestrator.state import initial_state
 
 @pytest.fixture
 def mock_deps():
+    agents_config = MagicMock()
+    agents_config.specialists = {
+        "python-expert": {
+            "model": "claude-sonnet-4-6",
+            "execution": "cli",
+            "max_iterations": 10,
+            "completion_promise": "TASK COMPLETE",
+        },
+    }
     return {
         "client": MagicMock(),
         "bot": MagicMock(),
@@ -15,6 +24,8 @@ def mock_deps():
         "branch_prefix": "scaffold",
         "spec_path": "/tmp/spec.md",
         "model": "claude-sonnet-4-20250514",
+        "agent_loader": MagicMock(),
+        "agents_config": agents_config,
     }
 
 
