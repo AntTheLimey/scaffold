@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from langgraph.graph import END, START, StateGraph
 
 from orchestrator.agent_loader import AgentLoader
@@ -7,6 +9,7 @@ from orchestrator.nodes.consensus import make_consensus_node
 from orchestrator.nodes.designer import make_designer_node
 from orchestrator.nodes.developer import make_developer_node
 from orchestrator.nodes.human_gate import make_human_gate_node
+from orchestrator.nodes.onboarding import make_onboarding_node
 from orchestrator.nodes.product_owner import make_product_owner_node
 from orchestrator.nodes.qa import make_qa_node
 from orchestrator.nodes.reviewer import make_reviewer_node
@@ -65,15 +68,19 @@ def build_graph(
     repo_path: str,
     branch_prefix: str,
     spec_path: str,
-    model: str,
-    agent_loader: AgentLoader | None = None,
-    agents_config: AgentsConfig | None = None,
+    agent_loader: AgentLoader,
+    agents_config: AgentsConfig,
     checkpointer=None,
 ):
     graph = StateGraph(TaskState)
 
-    assert agent_loader is not None, "agent_loader is required"
-    assert agents_config is not None, "agents_config is required"
+    reviewer_model = agents_config.workflow.get("reviewer", {}).get("model", "claude-sonnet-4-6")
+    qa_model = agents_config.workflow.get("qa", {}).get("model", "claude-sonnet-4-6")
+
+    graph.add_node(
+        "onboarding",
+        make_onboarding_node(repo_path, Path(agent_loader.agents_dir)),
+    )
     graph.add_node("product_owner", make_product_owner_node(client, spec_path, agent_loader))
     graph.add_node("architect", make_architect_node(client, agent_loader))
     graph.add_node("designer", make_designer_node(client, agent_loader))
@@ -81,13 +88,16 @@ def build_graph(
         "developer",
         make_developer_node(repo_path, branch_prefix, agent_loader, agents_config, client),
     )
-    graph.add_node("reviewer", make_reviewer_node(repo_path, branch_prefix, model, agent_loader))
-    graph.add_node("qa", make_qa_node(repo_path, branch_prefix, model, agent_loader))
+    graph.add_node(
+        "reviewer", make_reviewer_node(repo_path, branch_prefix, reviewer_model, agent_loader)
+    )
+    graph.add_node("qa", make_qa_node(repo_path, branch_prefix, qa_model, agent_loader))
     graph.add_node("consensus", make_consensus_node(client, agent_loader))
     graph.add_node("human_gate", make_human_gate_node(bot))
 
+    graph.add_edge(START, "onboarding")
     graph.add_conditional_edges(
-        START,
+        "onboarding",
         intake_router,
         {
             "product_owner": "product_owner",

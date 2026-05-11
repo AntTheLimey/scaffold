@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from orchestrator.agent_loader import AgentLoader
+from orchestrator.state import TaskState
 
 # Maps detected language to default specialist name
 LANGUAGE_TO_SPECIALIST: dict[str, str] = {
@@ -194,7 +195,7 @@ def make_onboarding_node(repo_path: str, agents_dir: Path):
     _repo_path = Path(repo_path)
     loader = AgentLoader(agents_dir)
 
-    def onboarding_node(state: dict) -> dict:
+    def onboarding_node(state: TaskState) -> dict:
         detection = detect_project(_repo_path)
         available = loader.list_specialists()
 

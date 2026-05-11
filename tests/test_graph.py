@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -17,14 +18,19 @@ def mock_deps():
             "completion_promise": "TASK COMPLETE",
         },
     }
+    agents_config.workflow = {
+        "reviewer": {"model": "claude-sonnet-4-6"},
+        "qa": {"model": "claude-sonnet-4-6"},
+    }
+    mock_loader = MagicMock()
+    mock_loader.agents_dir = Path("/tmp/agents")
     return {
         "client": MagicMock(),
         "bot": MagicMock(),
         "repo_path": "/tmp/repo",
         "branch_prefix": "scaffold",
         "spec_path": "/tmp/spec.md",
-        "model": "claude-sonnet-4-20250514",
-        "agent_loader": MagicMock(),
+        "agent_loader": mock_loader,
         "agents_config": agents_config,
     }
 
@@ -34,10 +40,17 @@ def test_build_graph_compiles(mock_deps):
     assert graph is not None
 
 
+def test_graph_has_onboarding_node(mock_deps):
+    graph = build_graph(**mock_deps)
+    node_names = set(graph.nodes.keys())
+    assert "onboarding" in node_names
+
+
 def test_graph_has_all_nodes(mock_deps):
     graph = build_graph(**mock_deps)
     node_names = set(graph.nodes.keys())
     expected = {
+        "onboarding",
         "product_owner",
         "architect",
         "designer",

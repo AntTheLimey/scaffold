@@ -6,6 +6,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 
+from orchestrator.agent_loader import AgentLoader
 from orchestrator.config import load_config
 from orchestrator.db import get_connection, init_db
 from orchestrator.graph import build_graph
@@ -24,13 +25,16 @@ def _checkpoint_path(db_path: str) -> str:
 def _build_scaffold(cfg, spec_path: str, checkpointer):
     client = anthropic.Anthropic()
     bot = TelegramBot(token="", chat_id="")
+    agents_dir = Path(__file__).parent / "agents"
+    agent_loader = AgentLoader(agents_dir)
     graph = build_graph(
         client=client,
         bot=bot,
         repo_path=cfg.project.repo_path,
         branch_prefix=cfg.project.branch_prefix,
         spec_path=spec_path,
-        model="claude-sonnet-4-20250514",
+        agent_loader=agent_loader,
+        agents_config=cfg.agents,
         checkpointer=checkpointer,
     )
     return graph, bot
