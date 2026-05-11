@@ -2,8 +2,6 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-PROMPTS_DIR = Path(__file__).parent.parent.parent / "prompts"
-
 
 @dataclass
 class AgentResult:
@@ -17,12 +15,6 @@ class AdvisorAgent:
         self.role = role
         self.model = model
         self.client = client
-
-    def load_prompt(self) -> str:
-        prompt_file = PROMPTS_DIR / f"{self.role}.md"
-        if prompt_file.exists():
-            return prompt_file.read_text()
-        return ""
 
     def call(
         self,

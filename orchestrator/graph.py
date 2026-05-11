@@ -72,18 +72,18 @@ def build_graph(
 ):
     graph = StateGraph(TaskState)
 
-    graph.add_node("product_owner", make_product_owner_node(client, spec_path))
-    graph.add_node("architect", make_architect_node(client))
-    graph.add_node("designer", make_designer_node(client))
     assert agent_loader is not None, "agent_loader is required"
     assert agents_config is not None, "agents_config is required"
+    graph.add_node("product_owner", make_product_owner_node(client, spec_path, agent_loader))
+    graph.add_node("architect", make_architect_node(client, agent_loader))
+    graph.add_node("designer", make_designer_node(client, agent_loader))
     graph.add_node(
         "developer",
         make_developer_node(repo_path, branch_prefix, agent_loader, agents_config, client),
     )
     graph.add_node("reviewer", make_reviewer_node(repo_path, branch_prefix, model, agent_loader))
     graph.add_node("qa", make_qa_node(repo_path, branch_prefix, model, agent_loader))
-    graph.add_node("consensus", make_consensus_node(client))
+    graph.add_node("consensus", make_consensus_node(client, agent_loader))
     graph.add_node("human_gate", make_human_gate_node(bot))
 
     graph.add_conditional_edges(
