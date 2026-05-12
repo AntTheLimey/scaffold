@@ -11,6 +11,8 @@ from orchestrator.agent_loader import AgentLoader
 from orchestrator.config import load_config
 from orchestrator.db import get_connection, init_db
 from orchestrator.graph import build_graph
+from orchestrator.init import format_detection, run_init
+from orchestrator.nodes.onboarding import detect_project
 from orchestrator.preflight import run_preflight
 from orchestrator.state import initial_state
 from orchestrator.task_tree import TaskTree
@@ -159,6 +161,24 @@ def preflight(config):
     else:
         click.echo("\nPreflight failed.")
         raise SystemExit(1)
+
+
+@cli.command()
+@click.argument("repo_path", type=click.Path(exists=True))
+@click.option("--config", default="config/", type=click.Path(), help="Scaffold config directory")
+def init(repo_path, config):
+    """Initialize a target repo for scaffold."""
+    repo = Path(repo_path).resolve()
+    detection = detect_project(repo)
+    click.echo(f"\n{format_detection(detection)}\n")
+    result = run_init(str(repo), config)
+    click.echo("\nCreated:")
+    click.echo(f"  {result['claude_md_path']}")
+    click.echo(f"  {result['project_yaml_path']}")
+    project = result["project_name"]
+    click.echo(
+        f"\nRun 'scaffold run --spec <spec> --config {config} --project {project}' to start."
+    )
 
 
 @cli.command()

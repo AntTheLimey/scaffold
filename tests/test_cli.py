@@ -243,3 +243,66 @@ def test_cli_preflight_fails_when_checks_fail(runner, config_dir):
         result = runner.invoke(cli, ["preflight", "--config", str(config_dir)])
         assert result.exit_code != 0
         assert "Preflight failed" in result.output
+
+
+def test_cli_init_command(runner, tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "projects").mkdir()
+
+    with patch("orchestrator.__main__.run_init") as mock_init:
+        mock_init.return_value = {
+            "project_name": "myrepo",
+            "claude_md_action": "create",
+            "claude_md_path": str(repo / "CLAUDE.md"),
+            "project_yaml_path": str(config_dir / "projects" / "myrepo.yaml"),
+        }
+        result = runner.invoke(
+            cli,
+            ["init", str(repo), "--config", str(config_dir)],
+        )
+        assert result.exit_code == 0
+        mock_init.assert_called_once_with(str(repo), str(config_dir))
+        assert "myrepo" in result.output
+
+
+def test_cli_init_shows_detection(runner, tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+
+    with (
+        patch("orchestrator.__main__.detect_project") as mock_detect,
+        patch("orchestrator.__main__.format_detection") as mock_format,
+        patch("orchestrator.__main__.run_init") as mock_init,
+    ):
+        mock_detect.return_value = {
+            "detected_languages": ["python"],
+            "detected_frameworks": [],
+            "test_framework": "pytest",
+            "has_database": False,
+            "has_makefile": True,
+            "claude_md_quality": "missing",
+            "project_context": "",
+        }
+        mock_format.return_value = "Detected:\n  Languages ... Python"
+        mock_init.return_value = {
+            "project_name": "myrepo",
+            "claude_md_action": "create",
+            "claude_md_path": str(repo / "CLAUDE.md"),
+            "project_yaml_path": str(config_dir / "projects" / "myrepo.yaml"),
+        }
+        result = runner.invoke(
+            cli,
+            ["init", str(repo), "--config", str(config_dir)],
+        )
+        assert result.exit_code == 0
+        assert "Detected" in result.output
+
+
+def test_cli_help_shows_init(runner):
+    result = runner.invoke(cli, ["--help"])
+    assert "init" in result.output
