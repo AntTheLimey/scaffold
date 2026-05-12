@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from orchestrator.config import ScaffoldConfig
+from orchestrator.telegram import TelegramBot
 
 
 @dataclass
@@ -76,12 +77,26 @@ def run_preflight(cfg: ScaffoldConfig) -> PreflightResult:
     telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     telegram_chat = os.environ.get("TELEGRAM_CHAT_ID", "")
     has_telegram = bool(telegram_token and telegram_chat)
-    result.checks.append(
-        Check(
-            name="Telegram (optional)",
-            passed=True,
-            status="OK" if has_telegram else "SKIP (not configured)",
+    if has_telegram:
+        bot = TelegramBot(token=telegram_token, chat_id=telegram_chat)
+        try:
+            telegram_ok = bot.ping()
+        finally:
+            bot.close()
+        result.checks.append(
+            Check(
+                name="Telegram",
+                passed=telegram_ok,
+                status="OK (test message sent)" if telegram_ok else "FAIL (check token/chat_id)",
+            )
         )
-    )
+    else:
+        result.checks.append(
+            Check(
+                name="Telegram (optional)",
+                passed=True,
+                status="SKIP (not configured)",
+            )
+        )
 
     return result

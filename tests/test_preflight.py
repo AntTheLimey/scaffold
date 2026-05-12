@@ -89,3 +89,51 @@ def test_preflight_telegram_optional(valid_config):
         result = run_preflight(valid_config)
         telegram_check = next(c for c in result.checks if "Telegram" in c.name)
         assert telegram_check.status == "SKIP (not configured)"
+
+
+def test_preflight_telegram_ping_ok(valid_config):
+    with (
+        patch("orchestrator.preflight.shutil.which", return_value="/usr/bin/claude"),
+        patch("orchestrator.preflight.subprocess.run") as mock_run,
+        patch("orchestrator.preflight.TelegramBot") as MockBot,
+        patch.dict(
+            os.environ,
+            {
+                "ANTHROPIC_API_KEY": "sk-test-key",
+                "TELEGRAM_BOT_TOKEN": "123:ABC",
+                "TELEGRAM_CHAT_ID": "456",
+            },
+        ),
+    ):
+        mock_run.return_value = type("R", (), {"returncode": 0, "stdout": "user"})()
+        mock_bot = MockBot.return_value
+        mock_bot.ping.return_value = True
+        result = run_preflight(valid_config)
+        telegram_check = next(c for c in result.checks if "Telegram" in c.name)
+        assert telegram_check.passed
+        assert "test message sent" in telegram_check.status
+        mock_bot.close.assert_called_once()
+
+
+def test_preflight_telegram_ping_fails(valid_config):
+    with (
+        patch("orchestrator.preflight.shutil.which", return_value="/usr/bin/claude"),
+        patch("orchestrator.preflight.subprocess.run") as mock_run,
+        patch("orchestrator.preflight.TelegramBot") as MockBot,
+        patch.dict(
+            os.environ,
+            {
+                "ANTHROPIC_API_KEY": "sk-test-key",
+                "TELEGRAM_BOT_TOKEN": "bad-token",
+                "TELEGRAM_CHAT_ID": "456",
+            },
+        ),
+    ):
+        mock_run.return_value = type("R", (), {"returncode": 0, "stdout": "user"})()
+        mock_bot = MockBot.return_value
+        mock_bot.ping.return_value = False
+        result = run_preflight(valid_config)
+        telegram_check = next(c for c in result.checks if "Telegram" in c.name)
+        assert not telegram_check.passed
+        assert "FAIL" in telegram_check.status
+        mock_bot.close.assert_called_once()

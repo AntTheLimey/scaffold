@@ -22,6 +22,25 @@ class TelegramBot:
     def __exit__(self, *args):
         self.close()
 
+    def ping(self) -> bool:
+        if not self.token:
+            return False
+        try:
+            resp = self.client.get(f"{self.base_url}/getMe")
+            resp.raise_for_status()
+            bot_name = resp.json().get("result", {}).get("username", "unknown")
+            msg_resp = self.client.post(
+                f"{self.base_url}/sendMessage",
+                json={
+                    "chat_id": self.chat_id,
+                    "text": f"Scaffold connected. Bot @{bot_name} ready.",
+                },
+            )
+            msg_resp.raise_for_status()
+            return True
+        except (httpx.HTTPError, KeyError):
+            return False
+
     def send_escalation(self, question: str, options: list[str], task_id: str) -> int:
         if not self.token:
             return 0
