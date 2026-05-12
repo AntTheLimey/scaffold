@@ -1,6 +1,8 @@
 import re
 from pathlib import Path
 
+import yaml
+
 # Known names that require non-standard capitalisation.
 _KNOWN_NAMES: dict[str, str] = {
     "typescript": "TypeScript",
@@ -136,3 +138,18 @@ def generate_claude_md(
         sections.append(f"\n## Off-Limits\n\n{interview['off_limits']}")
 
     return "\n".join(sections) + "\n"
+
+
+def derive_project_name(repo_path: str) -> str:
+    name = Path(repo_path).resolve().name
+    return name.lower().replace(" ", "-")
+
+
+def generate_project_yaml(repo_path: str, project_name: str) -> str:
+    data = {
+        "repo_path": str(Path(repo_path)),
+        "branch_prefix": "scaffold",
+        "max_concurrent_agents": 3,
+        "db_path": f"scaffold_{project_name}.db",
+    }
+    return yaml.dump(data, default_flow_style=False, sort_keys=False)

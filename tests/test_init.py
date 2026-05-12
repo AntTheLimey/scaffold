@@ -1,8 +1,12 @@
+import yaml
+
 from orchestrator.init import (
+    derive_project_name,
     detect_code_style,
     extract_makefile_targets,
     format_detection,
     generate_claude_md,
+    generate_project_yaml,
 )
 
 
@@ -181,3 +185,28 @@ def test_generate_claude_md_no_empty_sections():
     assert "## Code Style" not in content
     assert "## Conventions" not in content
     assert "## Off-Limits" not in content
+
+
+def test_derive_project_name_simple():
+    assert derive_project_name("/home/user/my-webapp") == "my-webapp"
+
+
+def test_derive_project_name_spaces():
+    assert derive_project_name("/home/user/My Project") == "my-project"
+
+
+def test_derive_project_name_uppercase():
+    assert derive_project_name("/home/user/MyApp") == "myapp"
+
+
+def test_derive_project_name_trailing_slash():
+    assert derive_project_name("/home/user/repo/") == "repo"
+
+
+def test_generate_project_yaml():
+    content = generate_project_yaml("/home/user/webapp", "webapp")
+    data = yaml.safe_load(content)
+    assert data["repo_path"] == "/home/user/webapp"
+    assert data["branch_prefix"] == "scaffold"
+    assert data["max_concurrent_agents"] == 3
+    assert data["db_path"] == "scaffold_webapp.db"
