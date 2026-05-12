@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import yaml
 
 from orchestrator.init import (
@@ -7,6 +9,7 @@ from orchestrator.init import (
     format_detection,
     generate_claude_md,
     generate_project_yaml,
+    run_init,
 )
 
 
@@ -210,3 +213,99 @@ def test_generate_project_yaml():
     assert data["branch_prefix"] == "scaffold"
     assert data["max_concurrent_agents"] == 3
     assert data["db_path"] == "scaffold_webapp.db"
+
+
+def test_run_init_creates_claude_md(tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    (repo / "pyproject.toml").write_text("[tool.pytest.ini_options]\n")
+    (repo / "ruff.toml").write_text("line-length = 100\n")
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "projects").mkdir()
+
+    with patch("click.prompt", side_effect=["A widget API", "", ""]):
+        run_init(str(repo), str(config_dir))
+
+    claude_md = repo / "CLAUDE.md"
+    assert claude_md.exists()
+    content = claude_md.read_text()
+    assert "# A widget API" in content
+
+
+def test_run_init_creates_project_yaml(tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "projects").mkdir()
+
+    with patch("click.prompt", side_effect=["A project", "", ""]):
+        run_init(str(repo), str(config_dir))
+
+    project_yaml = config_dir / "projects" / "myrepo.yaml"
+    assert project_yaml.exists()
+    data = yaml.safe_load(project_yaml.read_text())
+    assert data["repo_path"] == str(repo.resolve())
+
+
+def test_run_init_creates_projects_dir_if_missing(tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+
+    with patch("click.prompt", side_effect=["A project", "", ""]):
+        run_init(str(repo), str(config_dir))
+
+    assert (config_dir / "projects").is_dir()
+
+
+def test_run_init_skips_when_substantive_claude_md(tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    claude_md = repo / "CLAUDE.md"
+    claude_md.write_text("# Existing\n" + "line\n" * 60)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "projects").mkdir()
+
+    with patch("click.prompt") as mock_prompt:
+        mock_prompt.return_value = "skip"
+        result = run_init(str(repo), str(config_dir))
+
+    assert result["claude_md_action"] == "skip"
+    content = claude_md.read_text()
+    assert "# Existing" in content
+
+
+def test_run_init_overwrites_when_requested(tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    claude_md = repo / "CLAUDE.md"
+    claude_md.write_text("# Old\n" + "line\n" * 60)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "projects").mkdir()
+
+    with patch("click.prompt", side_effect=["overwrite", "New description", "", ""]):
+        run_init(str(repo), str(config_dir))
+
+    content = claude_md.read_text()
+    assert "# New description" in content
+    assert "# Old" not in content
+
+
+def test_run_init_returns_summary(tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "projects").mkdir()
+
+    with patch("click.prompt", side_effect=["A project", "", ""]):
+        result = run_init(str(repo), str(config_dir))
+
+    assert "project_name" in result
+    assert "claude_md_path" in result
+    assert "project_yaml_path" in result

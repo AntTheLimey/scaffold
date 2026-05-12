@@ -1,7 +1,10 @@
 import re
 from pathlib import Path
 
+import click
 import yaml
+
+from orchestrator.nodes.onboarding import detect_project
 
 # Known names that require non-standard capitalisation.
 _KNOWN_NAMES: dict[str, str] = {
@@ -153,3 +156,77 @@ def generate_project_yaml(repo_path: str, project_name: str) -> str:
         "db_path": f"scaffold_{project_name}.db",
     }
     return yaml.dump(data, default_flow_style=False, sort_keys=False)
+
+
+def _write_project_yaml(projects_dir: Path, project_name: str, repo_path: str) -> None:
+    content = generate_project_yaml(repo_path, project_name)
+    (projects_dir / f"{project_name}.yaml").write_text(content)
+
+
+def run_init(repo_path: str, config_dir: str) -> dict:
+    repo = Path(repo_path).resolve()
+    config = Path(config_dir)
+    projects_dir = config / "projects"
+    projects_dir.mkdir(parents=True, exist_ok=True)
+
+    detection = detect_project(repo)
+    project_name = derive_project_name(str(repo))
+
+    claude_md_action = "create"
+    if detection["claude_md_quality"] == "substantive":
+        choice = click.prompt(
+            f"CLAUDE.md already exists ({len(detection['project_context'].splitlines())} lines). "
+            "Overwrite, augment, or skip?",
+            type=click.Choice(["overwrite", "augment", "skip"], case_sensitive=False),
+            default="skip",
+        )
+        claude_md_action = choice
+        if choice == "skip":
+            _write_project_yaml(projects_dir, project_name, str(repo))
+            return {
+                "project_name": project_name,
+                "claude_md_action": "skip",
+                "claude_md_path": str(repo / "CLAUDE.md"),
+                "project_yaml_path": str(projects_dir / f"{project_name}.yaml"),
+            }
+
+    if claude_md_action in ("create", "overwrite"):
+        description = click.prompt("What does this project do?")
+        conventions = click.prompt(
+            "Any conventions not captured in existing docs? (press Enter to skip)",
+            default="",
+        )
+        off_limits = click.prompt(
+            "Anything agents should avoid touching? (press Enter to skip)",
+            default="",
+        )
+    else:
+        description = click.prompt("Project description (for header)", default="")
+        conventions = ""
+        off_limits = ""
+
+    interview = {
+        "description": description,
+        "conventions": conventions,
+        "off_limits": off_limits,
+    }
+
+    makefile_targets = extract_makefile_targets(repo)
+    code_style = detect_code_style(repo)
+
+    claude_md_content = generate_claude_md(detection, interview, makefile_targets, code_style)
+
+    claude_md_path = repo / "CLAUDE.md"
+    if claude_md_action == "augment" and claude_md_path.exists():
+        existing = claude_md_path.read_text()
+        claude_md_content = existing.rstrip() + "\n\n" + claude_md_content
+    claude_md_path.write_text(claude_md_content)
+
+    _write_project_yaml(projects_dir, project_name, str(repo))
+
+    return {
+        "project_name": project_name,
+        "claude_md_action": claude_md_action,
+        "claude_md_path": str(claude_md_path),
+        "project_yaml_path": str(projects_dir / f"{project_name}.yaml"),
+    }
