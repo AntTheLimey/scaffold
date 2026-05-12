@@ -63,3 +63,58 @@ def test_project_config_no_telegram_fields(config_dir):
     assert not hasattr(cfg.project, "telegram_bot_token")
     assert not hasattr(cfg.project, "telegram_chat_id")
     assert not hasattr(cfg.project, "spec_path")
+
+
+def test_load_config_with_project(tmp_path):
+    governance = tmp_path / "governance.yaml"
+    governance.write_text(
+        "rapid:\n"
+        "  product_scope:\n"
+        "    recommend: product_owner\n"
+        "raci:\n"
+        "  write_code:\n"
+        "    responsible: developer\n"
+    )
+    agents = tmp_path / "agents.yaml"
+    agents.write_text(
+        "workflow:\n"
+        "  product_owner:\n"
+        "    model: claude-opus-4-6\n"
+        "    execution: api\n"
+        "specialists:\n"
+        "  python-expert:\n"
+        "    model: claude-sonnet-4-6\n"
+        "    execution: cli\n"
+        "    max_iterations: 10\n"
+        "    completion_promise: TASK COMPLETE\n"
+        "escalation:\n"
+        "  stuck_loop_model: claude-opus-4-6\n"
+    )
+    projects_dir = tmp_path / "projects"
+    projects_dir.mkdir()
+    project_file = projects_dir / "webapp.yaml"
+    project_file.write_text(
+        "repo_path: /tmp/webapp\n"
+        "branch_prefix: scaffold\n"
+        "max_concurrent_agents: 3\n"
+        "db_path: scaffold_webapp.db\n"
+    )
+    cfg = load_config(str(tmp_path), project="webapp")
+    assert cfg.project.repo_path == "/tmp/webapp"
+    assert cfg.project.db_path == "scaffold_webapp.db"
+
+
+def test_load_config_without_project_uses_root(config_dir):
+    cfg = load_config(config_dir)
+    assert cfg.project.repo_path == "/tmp/test-repo"
+
+
+def test_load_config_project_not_found(tmp_path):
+    governance = tmp_path / "governance.yaml"
+    governance.write_text("rapid: {}\nraci: {}\n")
+    agents = tmp_path / "agents.yaml"
+    agents.write_text("workflow: {}\nspecialists: {}\nescalation: {}\n")
+    import pytest
+
+    with pytest.raises(FileNotFoundError):
+        load_config(str(tmp_path), project="nonexistent")

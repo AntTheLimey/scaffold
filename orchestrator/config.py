@@ -32,7 +32,7 @@ class ScaffoldConfig:
     project: ProjectConfig
 
 
-def load_config(config_dir: str | Path) -> ScaffoldConfig:
+def load_config(config_dir: str | Path, project: str | None = None) -> ScaffoldConfig:
     config_dir = Path(config_dir)
 
     with open(config_dir / "governance.yaml") as f:
@@ -50,8 +50,17 @@ def load_config(config_dir: str | Path) -> ScaffoldConfig:
         escalation=agents_data.get("escalation", {}),
     )
 
-    with open(config_dir / "project.yaml") as f:
-        proj_data = yaml.safe_load(f)
-    project = ProjectConfig(**proj_data)
+    if project:
+        project_path = config_dir / "projects" / f"{project}.yaml"
+        if not project_path.exists():
+            raise FileNotFoundError(
+                f"Project '{project}' not found at {project_path}. Run 'scaffold init' first."
+            )
+        with open(project_path) as f:
+            proj_data = yaml.safe_load(f)
+    else:
+        with open(config_dir / "project.yaml") as f:
+            proj_data = yaml.safe_load(f)
+    project_cfg = ProjectConfig(**proj_data)
 
-    return ScaffoldConfig(governance=governance, agents=agents, project=project)
+    return ScaffoldConfig(governance=governance, agents=agents, project=project_cfg)
