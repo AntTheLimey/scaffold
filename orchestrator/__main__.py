@@ -58,9 +58,14 @@ def cli():
 @click.option(
     "--config", required=True, type=click.Path(exists=True), help="Path to config directory"
 )
-def run(spec, config):
+@click.option("--project", default=None, help="Project name (from config/projects/)")
+def run(spec, config, project):
     """Start a new scaffold run from a master spec."""
-    cfg = load_config(config)
+    try:
+        cfg = load_config(config, project=project)
+    except FileNotFoundError as e:
+        click.echo(str(e))
+        raise SystemExit(1) from e
     preflight_result = run_preflight(cfg)
     if not preflight_result.ok:
         for check in preflight_result.checks:
@@ -93,13 +98,18 @@ def run(spec, config):
     "--config", required=True, type=click.Path(exists=True), help="Path to config directory"
 )
 @click.option("--spec", default="", help="Path to master spec (needed if re-entering planning)")
-def resume(task, db, config, spec):
+@click.option("--project", default=None, help="Project name (from config/projects/)")
+def resume(task, db, config, spec, project):
     """Resume an interrupted scaffold run."""
     if not Path(db).exists():
         click.echo("No database found. Run 'scaffold run' first.")
         raise SystemExit(1)
 
-    cfg = load_config(config)
+    try:
+        cfg = load_config(config, project=project)
+    except FileNotFoundError as e:
+        click.echo(str(e))
+        raise SystemExit(1) from e
 
     with SqliteSaver.from_conn_string(_checkpoint_path(db)) as checkpointer:
         graph, bot = _build_scaffold(cfg, spec, checkpointer)
@@ -122,13 +132,18 @@ def resume(task, db, config, spec):
     "--config", required=True, type=click.Path(exists=True), help="Path to config directory"
 )
 @click.option("--spec", default="", help="Path to master spec (needed if re-entering planning)")
-def decide(task, choice, db, config, spec):
+@click.option("--project", default=None, help="Project name (from config/projects/)")
+def decide(task, choice, db, config, spec, project):
     """Provide a human decision for a paused task."""
     if not Path(db).exists():
         click.echo("No database found.")
         raise SystemExit(1)
 
-    cfg = load_config(config)
+    try:
+        cfg = load_config(config, project=project)
+    except FileNotFoundError as e:
+        click.echo(str(e))
+        raise SystemExit(1) from e
 
     with SqliteSaver.from_conn_string(_checkpoint_path(db)) as checkpointer:
         graph, bot = _build_scaffold(cfg, spec, checkpointer)

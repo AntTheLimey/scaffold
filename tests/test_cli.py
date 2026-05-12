@@ -306,3 +306,86 @@ def test_cli_init_shows_detection(runner, tmp_path):
 def test_cli_help_shows_init(runner):
     result = runner.invoke(cli, ["--help"])
     assert "init" in result.output
+
+
+def test_cli_run_with_project(runner, tmp_path):
+    spec = tmp_path / "spec.md"
+    spec.write_text("# Test Spec")
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    governance = config_dir / "governance.yaml"
+    governance.write_text("rapid: {}\nraci: {}\n")
+    agents = config_dir / "agents.yaml"
+    agents.write_text(
+        "workflow:\n"
+        "  product_owner:\n"
+        "    model: claude-opus-4-6\n"
+        "    execution: api\n"
+        "specialists:\n"
+        "  python-expert:\n"
+        "    model: claude-sonnet-4-6\n"
+        "    execution: cli\n"
+        "    max_iterations: 10\n"
+        "    completion_promise: TASK COMPLETE\n"
+        "escalation:\n"
+        "  stuck_loop_model: claude-opus-4-6\n"
+    )
+    projects_dir = config_dir / "projects"
+    projects_dir.mkdir()
+    project_file = projects_dir / "webapp.yaml"
+    project_file.write_text(
+        "repo_path: /tmp/repo\n"
+        "branch_prefix: scaffold\n"
+        "max_concurrent_agents: 3\n"
+        "db_path: ':memory:'\n"
+    )
+
+    with (
+        patch("orchestrator.__main__.build_graph") as mock_build,
+        patch("orchestrator.__main__.TelegramBot"),
+        patch("orchestrator.__main__.SqliteSaver"),
+        patch("orchestrator.__main__.AgentLoader"),
+        patch("orchestrator.__main__.run_preflight") as mock_preflight,
+    ):
+        mock_preflight.return_value.ok = True
+        mock_graph = MagicMock()
+        mock_build.return_value = mock_graph
+
+        result = runner.invoke(
+            cli,
+            [
+                "run",
+                "--spec",
+                str(spec),
+                "--config",
+                str(config_dir),
+                "--project",
+                "webapp",
+            ],
+        )
+        assert result.exit_code == 0
+
+
+def test_cli_run_project_not_found(runner, tmp_path):
+    spec = tmp_path / "spec.md"
+    spec.write_text("# Test Spec")
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    governance = config_dir / "governance.yaml"
+    governance.write_text("rapid: {}\nraci: {}\n")
+    agents = config_dir / "agents.yaml"
+    agents.write_text("workflow: {}\nspecialists: {}\nescalation: {}\n")
+
+    result = runner.invoke(
+        cli,
+        [
+            "run",
+            "--spec",
+            str(spec),
+            "--config",
+            str(config_dir),
+            "--project",
+            "nonexistent",
+        ],
+    )
+    assert result.exit_code != 0
