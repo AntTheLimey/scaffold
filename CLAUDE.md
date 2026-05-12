@@ -14,6 +14,7 @@ Project-agnostic — configured via YAML to target any repository.
   - **graph.py** — LangGraph StateGraph wiring with conditional routing
   - **state.py** — TaskState TypedDict shared across all nodes
   - **preflight.py** — environment validation before scaffold runs
+  - **init.py** — project initialization: detection display, interview, CLAUDE.md generation
   - **router.py** — RAPID/RACI governance routing
   - **self_heal.py** — stuck loop and cascading failure detection
   - **telegram.py** — Telegram Bot API for human escalation
@@ -69,6 +70,7 @@ make format       # Run ruff format
 make typecheck    # Run pyright
 make check        # lint + typecheck + test
 scaffold preflight --config config/   # Validate environment
+scaffold init /path/to/repo --config config/   # Initialize a target repo
 ```
 
 ### Testing
@@ -98,6 +100,8 @@ Each agent entry has: `model`, `execution` (api or cli), and optionally `max_ite
 
 ### project.yaml
 
-Keys: `repo_path`, `branch_prefix`, `max_concurrent_agents`, `db_path`.
+Per-project config in `config/projects/{name}.yaml`. Keys: `repo_path`, `branch_prefix`, `max_concurrent_agents`, `db_path`.
+
+Legacy: a single `config/project.yaml` is supported for backward compatibility when `--project` is not provided.
 
 Credentials are NOT stored in config files — use environment variables.
