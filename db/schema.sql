@@ -1,4 +1,4 @@
-CREATE TABLE tasks (
+CREATE TABLE IF NOT EXISTS tasks (
     id          TEXT PRIMARY KEY,
     parent_id   TEXT REFERENCES tasks(id),
     level       TEXT CHECK(level IN ('epic','feature','task','subtask')),
@@ -15,13 +15,13 @@ CREATE TABLE tasks (
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE task_edges (
+CREATE TABLE IF NOT EXISTS task_edges (
     blocker_id  TEXT REFERENCES tasks(id),
     blocked_id  TEXT REFERENCES tasks(id),
     PRIMARY KEY (blocker_id, blocked_id)
 );
 
-CREATE TABLE decisions (
+CREATE TABLE IF NOT EXISTS decisions (
     id          TEXT PRIMARY KEY,
     task_id     TEXT REFERENCES tasks(id),
     type        TEXT,
@@ -34,7 +34,7 @@ CREATE TABLE decisions (
     resolved_at TIMESTAMP
 );
 
-CREATE TABLE agent_runs (
+CREATE TABLE IF NOT EXISTS agent_runs (
     id          TEXT PRIMARY KEY,
     task_id     TEXT REFERENCES tasks(id),
     agent_role  TEXT NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE agent_runs (
     output      JSON
 );
 
-CREATE TABLE events (
+CREATE TABLE IF NOT EXISTS events (
     id          TEXT PRIMARY KEY,
     timestamp   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     task_id     TEXT REFERENCES tasks(id),
@@ -59,12 +59,12 @@ CREATE TABLE events (
     event_data  JSON NOT NULL
 );
 
-CREATE INDEX idx_events_task ON events(task_id, timestamp);
-CREATE INDEX idx_events_type ON events(event_type, timestamp);
-CREATE INDEX idx_tasks_status ON tasks(status);
-CREATE INDEX idx_tasks_parent ON tasks(parent_id);
+CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type, timestamp);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id);
 
-CREATE VIEW epic_costs AS
+CREATE VIEW IF NOT EXISTS epic_costs AS
 SELECT
     t2.title as epic_title,
     t.parent_id as epic_id,
@@ -77,7 +77,7 @@ JOIN agent_runs ar ON t.id = ar.task_id
 LEFT JOIN tasks t2 ON t.parent_id = t2.id
 GROUP BY t.parent_id;
 
-CREATE VIEW cycle_hotspots AS
+CREATE VIEW IF NOT EXISTS cycle_hotspots AS
 SELECT
     task_id,
     COUNT(*) as cycle_count,
@@ -87,7 +87,7 @@ WHERE event_type = 'task.cycle'
 GROUP BY task_id
 ORDER BY cycle_count DESC;
 
-CREATE VIEW agent_efficiency AS
+CREATE VIEW IF NOT EXISTS agent_efficiency AS
 SELECT
     agent_role,
     model,
