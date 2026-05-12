@@ -252,11 +252,25 @@ def test_cli_init_command(runner, tmp_path):
     config_dir.mkdir()
     (config_dir / "projects").mkdir()
 
-    with patch("orchestrator.__main__.run_init") as mock_init:
+    with (
+        patch("orchestrator.__main__.detect_project") as mock_detect,
+        patch("orchestrator.__main__.run_init") as mock_init,
+    ):
+        detection = {
+            "detected_languages": [],
+            "detected_frameworks": [],
+            "test_framework": "",
+            "has_database": False,
+            "has_makefile": False,
+            "claude_md_quality": "missing",
+            "project_context": "",
+        }
+        mock_detect.return_value = detection
         mock_init.return_value = {
             "project_name": "myrepo",
             "claude_md_action": "create",
             "claude_md_path": str(repo / "CLAUDE.md"),
+            "claude_md_lines": 12,
             "project_yaml_path": str(config_dir / "projects" / "myrepo.yaml"),
         }
         result = runner.invoke(
@@ -264,7 +278,7 @@ def test_cli_init_command(runner, tmp_path):
             ["init", str(repo), "--config", str(config_dir)],
         )
         assert result.exit_code == 0
-        mock_init.assert_called_once_with(str(repo), str(config_dir))
+        mock_init.assert_called_once_with(str(repo), str(config_dir), detection=detection)
         assert "myrepo" in result.output
 
 
@@ -293,6 +307,7 @@ def test_cli_init_shows_detection(runner, tmp_path):
             "project_name": "myrepo",
             "claude_md_action": "create",
             "claude_md_path": str(repo / "CLAUDE.md"),
+            "claude_md_lines": 12,
             "project_yaml_path": str(config_dir / "projects" / "myrepo.yaml"),
         }
         result = runner.invoke(

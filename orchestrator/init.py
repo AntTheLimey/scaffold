@@ -163,13 +163,32 @@ def _write_project_yaml(projects_dir: Path, project_name: str, repo_path: str) -
     (projects_dir / f"{project_name}.yaml").write_text(content)
 
 
-def run_init(repo_path: str, config_dir: str) -> dict:
+def _write_project_overrides(repo: Path, interview: dict) -> str | None:
+    conventions = interview.get("conventions", "")
+    off_limits = interview.get("off_limits", "")
+    if not conventions and not off_limits:
+        return None
+    agents_dir = repo / ".claude" / "agents"
+    agents_dir.mkdir(parents=True, exist_ok=True)
+    lines: list[str] = []
+    if conventions:
+        lines.append(f"## Conventions\n\n{conventions}")
+    if off_limits:
+        lines.append(f"## Off-Limits\n\n{off_limits}")
+    content = "\n\n".join(lines) + "\n"
+    path = agents_dir / "_project.md"
+    path.write_text(content)
+    return str(path)
+
+
+def run_init(repo_path: str, config_dir: str, detection: dict | None = None) -> dict:
     repo = Path(repo_path).resolve()
     config = Path(config_dir)
     projects_dir = config / "projects"
     projects_dir.mkdir(parents=True, exist_ok=True)
 
-    detection = detect_project(repo)
+    if detection is None:
+        detection = detect_project(repo)
     project_name = derive_project_name(str(repo))
 
     claude_md_action = "create"
@@ -221,12 +240,19 @@ def run_init(repo_path: str, config_dir: str) -> dict:
         existing = claude_md_path.read_text()
         claude_md_content = existing.rstrip() + "\n\n" + claude_md_content
     claude_md_path.write_text(claude_md_content)
+    claude_md_lines = len(claude_md_content.splitlines())
 
     _write_project_yaml(projects_dir, project_name, str(repo))
 
-    return {
+    overrides_path = _write_project_overrides(repo, interview)
+
+    result = {
         "project_name": project_name,
         "claude_md_action": claude_md_action,
         "claude_md_path": str(claude_md_path),
+        "claude_md_lines": claude_md_lines,
         "project_yaml_path": str(projects_dir / f"{project_name}.yaml"),
     }
+    if overrides_path:
+        result["overrides_path"] = overrides_path
+    return result

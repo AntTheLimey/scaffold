@@ -186,10 +186,13 @@ def init(repo_path, config):
     repo = Path(repo_path).resolve()
     detection = detect_project(repo)
     click.echo(f"\n{format_detection(detection)}\n")
-    result = run_init(str(repo), config)
+    result = run_init(str(repo), config, detection=detection)
     click.echo("\nCreated:")
-    click.echo(f"  {result['claude_md_path']}")
+    if result["claude_md_action"] != "skip":
+        click.echo(f"  {result['claude_md_path']} ({result['claude_md_lines']} lines)")
     click.echo(f"  {result['project_yaml_path']}")
+    if result.get("overrides_path"):
+        click.echo(f"  {result['overrides_path']}")
     project = result["project_name"]
     click.echo(
         f"\nRun 'scaffold run --spec <spec> --config {config} --project {project}' to start."

@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import patch
 
 import yaml
@@ -309,3 +310,54 @@ def test_run_init_returns_summary(tmp_path):
     assert "project_name" in result
     assert "claude_md_path" in result
     assert "project_yaml_path" in result
+    assert "claude_md_lines" in result
+
+
+def test_run_init_augments_existing_claude_md(tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    claude_md = repo / "CLAUDE.md"
+    claude_md.write_text("# Existing project\n" + "line\n" * 60)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "projects").mkdir()
+
+    with patch("click.prompt", side_effect=["augment", "Augmented description"]):
+        result = run_init(str(repo), str(config_dir))
+
+    assert result["claude_md_action"] == "augment"
+    content = claude_md.read_text()
+    assert "# Existing project" in content
+    assert "# Augmented description" in content
+
+
+def test_run_init_writes_project_overrides(tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "projects").mkdir()
+
+    with patch("click.prompt", side_effect=["A project", "Use type hints", "Don't touch legacy/"]):
+        result = run_init(str(repo), str(config_dir))
+
+    assert "overrides_path" in result
+    overrides = Path(result["overrides_path"])
+    assert overrides.exists()
+    content = overrides.read_text()
+    assert "Use type hints" in content
+    assert "Don't touch legacy/" in content
+
+
+def test_run_init_no_overrides_when_no_conventions(tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "projects").mkdir()
+
+    with patch("click.prompt", side_effect=["A project", "", ""]):
+        result = run_init(str(repo), str(config_dir))
+
+    assert "overrides_path" not in result
+    assert not (repo / ".claude" / "agents" / "_project.md").exists()
