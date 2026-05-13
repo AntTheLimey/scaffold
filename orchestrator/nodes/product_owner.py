@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from orchestrator.agent_loader import AgentLoader
+from orchestrator.event_bus import get_bus
 from orchestrator.json_utils import extract_json
 from orchestrator.nodes.base import AdvisorAgent
 from orchestrator.state import TaskState
@@ -26,6 +27,9 @@ def make_product_owner_node(
     )
 
     def product_owner_node(state: TaskState) -> dict:
+        bus = get_bus()
+        if bus:
+            bus.node_enter("product_owner", state["task_id"], state["level"])
         system_prompt = agent_loader.load_workflow_agent("product_owner")
         if not system_prompt:
             system_prompt = SYSTEM_PROMPT
@@ -45,15 +49,26 @@ def make_product_owner_node(
             f"Master Spec:\n{spec_content}"
         )
 
+        if bus:
+            bus.api_call_start(
+                "product_owner", model, len(system_prompt) + len(user_message), state["task_id"]
+            )
         result = agent.call(
             system_prompt=system_prompt,
             user_message=user_message,
             cache_system=True,
         )
+        if bus:
+            bus.api_call_done(
+                "product_owner", model, result.token_in, result.token_out, state["task_id"]
+            )
 
         parsed = extract_json(result.text)
+        children = parsed.get("children", [])
+        if bus:
+            bus.node_exit("product_owner", state["task_id"], f"{len(children)} children decomposed")
         return {
-            "child_tasks": parsed.get("children", []),
+            "child_tasks": children,
             "status": "decomposing",
             "agent_output": result.text,
         }

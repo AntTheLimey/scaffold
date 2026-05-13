@@ -10,6 +10,7 @@ from langgraph.types import Command
 from orchestrator.agent_loader import AgentLoader
 from orchestrator.config import load_config
 from orchestrator.db import get_connection, init_db
+from orchestrator.event_bus import init_event_bus
 from orchestrator.graph import build_graph
 from orchestrator.init import format_detection, run_init
 from orchestrator.nodes.onboarding import detect_project
@@ -73,6 +74,7 @@ def run(spec, config, project):
         click.echo("\nPreflight failed. Fix the issues above and try again.")
         raise SystemExit(1)
     conn = init_db(cfg.project.db_path)
+    init_event_bus(conn)
 
     with SqliteSaver.from_conn_string(_checkpoint_path(cfg.project.db_path)) as checkpointer:
         graph, bot = _build_scaffold(cfg, spec, checkpointer)
@@ -111,6 +113,8 @@ def resume(task, db, config, spec, project):
         click.echo(str(e))
         raise SystemExit(1) from e
 
+    conn = get_connection(db)
+    init_event_bus(conn)
     with SqliteSaver.from_conn_string(_checkpoint_path(db)) as checkpointer:
         graph, bot = _build_scaffold(cfg, spec, checkpointer)
         try:
@@ -120,6 +124,7 @@ def resume(task, db, config, spec, project):
             click.echo(f"Resume complete. Status: {result.get('status', 'unknown')}")
         finally:
             bot.close()
+    conn.close()
 
 
 @cli.command()
@@ -145,6 +150,8 @@ def decide(task, choice, db, config, spec, project):
         click.echo(str(e))
         raise SystemExit(1) from e
 
+    conn = get_connection(db)
+    init_event_bus(conn)
     with SqliteSaver.from_conn_string(_checkpoint_path(db)) as checkpointer:
         graph, bot = _build_scaffold(cfg, spec, checkpointer)
         try:
@@ -157,6 +164,7 @@ def decide(task, choice, db, config, spec, project):
             click.echo(f"Status: {result.get('status', 'unknown')}")
         finally:
             bot.close()
+    conn.close()
 
 
 @cli.command()
