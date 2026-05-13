@@ -214,6 +214,39 @@ def test_run_task_graph_invoke_exception_marks_stuck(db):
     assert row["status"] == "stuck"
 
 
+def test_run_task_malformed_child_skipped(db):
+    from orchestrator.task_tree import TaskTree
+
+    tree = TaskTree(db)
+    parent_id = tree.create(title="Epic", level="epic")
+
+    graph = MagicMock()
+
+    def mock_invoke(state, config=None):
+        if state["level"] == "epic":
+            return {
+                "status": "decomposing",
+                "child_tasks": ["not-a-dict", {"title": "Good", "level": "task"}],
+                "project_context": "",
+                "specialists": [],
+                "advisory": [],
+                "detected_languages": [],
+                "test_framework": "",
+            }
+        return {"status": "done", "child_tasks": []}
+
+    graph.invoke.side_effect = mock_invoke
+
+    state = initial_state(task_id=parent_id, level="epic")
+    run_task(graph, tree, state, parent_id)
+
+    parent = tree.get(parent_id)
+    assert parent["status"] == "blocked"
+    children = tree.list_children(parent_id)
+    assert len(children) == 1
+    assert children[0]["title"] == "Good"
+
+
 def test_normalize_acceptance_variants():
     assert _normalize_acceptance(None) == []
     assert _normalize_acceptance(["a", "b"]) == ["a", "b"]

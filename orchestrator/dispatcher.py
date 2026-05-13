@@ -75,6 +75,15 @@ def run_task(
 
     child_statuses: list[str] = []
     for child in children:
+        if not isinstance(child, dict):
+            child_statuses.append("stuck")
+            if bus:
+                bus.emit(
+                    "task.error",
+                    task_id=state["task_id"],
+                    error=f"invalid child payload: {type(child).__name__}",
+                )
+            continue
         child_level = child.get("level", "task")
         child_id = tree.create(
             title=child.get("title", "Untitled"),
@@ -102,7 +111,7 @@ def run_task(
 
         run_task(graph, tree, child_state, child_id)
         child_row = tree.get(child_id)
-        child_statuses.append(child_row["status"] if child_row else "done")
+        child_statuses.append(child_row["status"] if child_row else "stuck")
 
     final = "done" if all(s == "done" for s in child_statuses) else "blocked"
     tree.update_status(state["task_id"], final)
