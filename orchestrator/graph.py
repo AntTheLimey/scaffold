@@ -32,8 +32,19 @@ def intake_router(state: TaskState) -> str:
     return dest
 
 
+def product_owner_router(state: TaskState) -> str:
+    dest = "__end__" if state.get("child_tasks") else "architect"
+    bus = get_bus()
+    if bus:
+        children = len(state.get("child_tasks", []))
+        bus.route("product_owner", dest, f"children={children}", state["task_id"])
+    return dest
+
+
 def architect_router(state: TaskState) -> str:
-    if state.get("escalation_reason"):
+    if state.get("child_tasks"):
+        dest = "__end__"
+    elif state.get("escalation_reason"):
         dest = "human_gate"
     elif state.get("has_ui_component"):
         dest = "designer"
@@ -152,12 +163,20 @@ def build_graph(
         },
     )
 
-    graph.add_edge("product_owner", "architect")
+    graph.add_conditional_edges(
+        "product_owner",
+        product_owner_router,
+        {
+            "__end__": END,
+            "architect": "architect",
+        },
+    )
 
     graph.add_conditional_edges(
         "architect",
         architect_router,
         {
+            "__end__": END,
             "designer": "designer",
             "developer": "developer",
             "human_gate": "human_gate",

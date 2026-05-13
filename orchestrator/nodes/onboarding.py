@@ -200,6 +200,16 @@ def make_onboarding_node(repo_path: str, agents_dir: Path):
         bus = get_bus()
         if bus:
             bus.node_enter("onboarding", state["task_id"], state["level"])
+
+        if state.get("specialists"):
+            if bus:
+                bus.node_exit(
+                    "onboarding",
+                    state["task_id"],
+                    "passthrough (context inherited)",
+                )
+            return {}
+
         detection = detect_project(_repo_path)
         available = loader.list_specialists()
 
