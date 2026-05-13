@@ -10,6 +10,22 @@ from orchestrator.state import TaskState, initial_state
 from orchestrator.task_tree import TaskTree
 
 
+def _normalize_acceptance(raw: object) -> list[str]:
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return [str(x) for x in raw]
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [str(x) for x in parsed]
+        except (json.JSONDecodeError, ValueError):
+            pass
+        return [raw]
+    return []
+
+
 def run_task(
     graph: CompiledStateGraph,
     tree: TaskTree,
@@ -47,16 +63,18 @@ def run_task(
             children=len(children),
         )
 
+    child_statuses: list[str] = []
     for child in children:
+        child_level = child.get("level", "task")
         child_id = tree.create(
             title=child.get("title", "Untitled"),
-            level=child.get("level", "task"),
+            level=child_level,
             parent_id=state["task_id"],
             spec_ref=child.get("spec_ref"),
             acceptance=child.get("acceptance"),
         )
 
-        child_state = initial_state(task_id=child_id, level=child["level"])
+        child_state = initial_state(task_id=child_id, level=child_level)
         child_state["project_context"] = result.get("project_context", "")
         child_state["specialists"] = result.get("specialists", [])
         child_state["advisory"] = result.get("advisory", [])
@@ -66,22 +84,22 @@ def run_task(
         child_spec = f"# {child.get('title', 'Untitled')}\n\n"
         if child.get("spec_ref"):
             child_spec += f"Spec reference: {child['spec_ref']}\n\n"
-        if child.get("acceptance"):
-            criteria = child["acceptance"]
-            if isinstance(criteria, str):
-                criteria = json.loads(criteria)
+        criteria = _normalize_acceptance(child.get("acceptance"))
+        if criteria:
             child_spec += "Acceptance criteria:\n"
             child_spec += "\n".join(f"- {ac}" for ac in criteria)
         child_state["agent_output"] = child_spec
 
-        run_task(graph, tree, child_state, child_id)
+        child_result = run_task(graph, tree, child_state, child_id)
+        child_statuses.append(child_result.get("status", "done"))
 
-    tree.update_status(state["task_id"], "done")
+    final = "done" if all(s == "done" for s in child_statuses) else "blocked"
+    tree.update_status(state["task_id"], final)
     if bus:
         bus.emit(
             "task.done",
             task_id=state["task_id"],
-            status="done",
-            summary=f"all {len(children)} children complete",
+            status=final,
+            summary=f"{len(children)} children, status={final}",
         )
     return result

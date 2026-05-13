@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-from orchestrator.dispatcher import run_task
+from orchestrator.dispatcher import _normalize_acceptance, run_task
 from orchestrator.state import initial_state
 
 
@@ -160,3 +160,46 @@ def test_run_task_nested_decomposition(db):
     assert len(features) == 1
     tasks = tree.list_children(features[0]["id"])
     assert len(tasks) == 2
+
+
+def test_run_task_parent_blocked_when_child_not_done(db):
+    from orchestrator.task_tree import TaskTree
+
+    tree = TaskTree(db)
+    parent_id = tree.create(title="Epic", level="epic")
+
+    graph = MagicMock()
+
+    def mock_invoke(state, config=None):
+        if state["level"] == "epic":
+            return {
+                "status": "decomposing",
+                "child_tasks": [
+                    {"title": "OK", "level": "task"},
+                    {"title": "Stuck", "level": "task"},
+                ],
+                "project_context": "",
+                "specialists": [],
+                "advisory": [],
+                "detected_languages": [],
+                "test_framework": "",
+            }
+        if "Stuck" in state.get("agent_output", ""):
+            return {"status": "stuck", "child_tasks": []}
+        return {"status": "done", "child_tasks": []}
+
+    graph.invoke.side_effect = mock_invoke
+
+    state = initial_state(task_id=parent_id, level="epic")
+    run_task(graph, tree, state, parent_id)
+
+    parent = tree.get(parent_id)
+    assert parent["status"] == "blocked"
+
+
+def test_normalize_acceptance_variants():
+    assert _normalize_acceptance(None) == []
+    assert _normalize_acceptance(["a", "b"]) == ["a", "b"]
+    assert _normalize_acceptance('["x","y"]') == ["x", "y"]
+    assert _normalize_acceptance("plain text criterion") == ["plain text criterion"]
+    assert _normalize_acceptance(42) == []
