@@ -10,6 +10,7 @@ from langgraph.types import Command
 from orchestrator.agent_loader import AgentLoader
 from orchestrator.config import load_config
 from orchestrator.db import get_connection, init_db
+from orchestrator.dispatcher import run_task
 from orchestrator.event_bus import init_event_bus
 from orchestrator.graph import build_graph
 from orchestrator.init import format_detection, run_init
@@ -82,12 +83,11 @@ def run(spec, config, project):
             tree = TaskTree(conn)
             task_id = tree.create(title="Root", level="epic", spec_ref=spec)
             state = initial_state(task_id=task_id, level="epic")
-            thread_config: RunnableConfig = {"configurable": {"thread_id": task_id}}
 
             click.echo(f"Scaffold started. Task: {task_id}, DB: {cfg.project.db_path}")
 
-            result = graph.invoke(state, config=thread_config)
-            click.echo(f"Run complete. Status: {result.get('status', 'unknown')}")
+            run_task(graph, tree, state, task_id)
+            click.echo("Run complete.")
         finally:
             bot.close()
     conn.close()
