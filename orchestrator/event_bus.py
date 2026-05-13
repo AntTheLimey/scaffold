@@ -27,13 +27,16 @@ class EventBus:
         etype = event_type.ljust(14)
         detail = "  ".join(f"{k}={v}" for k, v in data.items()) if data else ""
         click.echo(f"[{ts}] {role} | {etype} | {task_id[:11]:<11} | {detail}")
-        self.telemetry.log(
-            event_type=event_type,
-            event_data=dict(data),
-            task_id=task_id or None,
-            agent_role=agent_role or None,
-            run_id=run_id,
-        )
+        try:
+            self.telemetry.log(
+                event_type=event_type,
+                event_data=dict(data),
+                task_id=task_id or None,
+                agent_role=agent_role or None,
+                run_id=run_id,
+            )
+        except Exception as exc:
+            click.echo(f"[event_bus] telemetry log failed: {exc}", err=True)
 
     def node_enter(self, node: str, task_id: str, level: str = "") -> None:
         self.emit("node.enter", agent_role=node, task_id=task_id, level=level)

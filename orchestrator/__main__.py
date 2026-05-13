@@ -113,6 +113,8 @@ def resume(task, db, config, spec, project):
         click.echo(str(e))
         raise SystemExit(1) from e
 
+    conn = get_connection(db)
+    init_event_bus(conn)
     with SqliteSaver.from_conn_string(_checkpoint_path(db)) as checkpointer:
         graph, bot = _build_scaffold(cfg, spec, checkpointer)
         try:
@@ -122,6 +124,7 @@ def resume(task, db, config, spec, project):
             click.echo(f"Resume complete. Status: {result.get('status', 'unknown')}")
         finally:
             bot.close()
+    conn.close()
 
 
 @cli.command()
@@ -147,6 +150,8 @@ def decide(task, choice, db, config, spec, project):
         click.echo(str(e))
         raise SystemExit(1) from e
 
+    conn = get_connection(db)
+    init_event_bus(conn)
     with SqliteSaver.from_conn_string(_checkpoint_path(db)) as checkpointer:
         graph, bot = _build_scaffold(cfg, spec, checkpointer)
         try:
@@ -159,6 +164,7 @@ def decide(task, choice, db, config, spec, project):
             click.echo(f"Status: {result.get('status', 'unknown')}")
         finally:
             bot.close()
+    conn.close()
 
 
 @cli.command()

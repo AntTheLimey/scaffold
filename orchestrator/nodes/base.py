@@ -132,17 +132,20 @@ class DoerAgent:
             else:
                 current_prompt = prompt
 
-            result = subprocess.run(
-                ["claude", "--model", self.model, "-p", current_prompt],
-                capture_output=True,
-                text=True,
-                cwd=str(worktree_path),
-                timeout=600,
-            )
-            last_output = result.stdout
-            success = self.completion_promise in result.stdout
-            if bus:
-                bus.cli_done(self.role, i, success, task_id)
+            success = False
+            try:
+                result = subprocess.run(
+                    ["claude", "--model", self.model, "-p", current_prompt],
+                    capture_output=True,
+                    text=True,
+                    cwd=str(worktree_path),
+                    timeout=600,
+                )
+                last_output = result.stdout
+                success = self.completion_promise in result.stdout
+            finally:
+                if bus:
+                    bus.cli_done(self.role, i, success, task_id)
             if success:
                 return RalphResult(success=True, iterations=i, output=result.stdout)
 
