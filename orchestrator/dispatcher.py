@@ -90,8 +90,9 @@ def run_task(
             child_spec += "\n".join(f"- {ac}" for ac in criteria)
         child_state["agent_output"] = child_spec
 
-        child_result = run_task(graph, tree, child_state, child_id)
-        child_statuses.append(child_result.get("status", "done"))
+        run_task(graph, tree, child_state, child_id)
+        child_row = tree.get(child_id)
+        child_statuses.append(child_row["status"] if child_row else "done")
 
     final = "done" if all(s == "done" for s in child_statuses) else "blocked"
     tree.update_status(state["task_id"], final)
@@ -102,4 +103,4 @@ def run_task(
             status=final,
             summary=f"{len(children)} children, status={final}",
         )
-    return result
+    return {**result, "status": final}
