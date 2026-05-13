@@ -8,7 +8,7 @@ from orchestrator.telegram import TelegramBot
 def make_human_gate_node(bot: TelegramBot):
     def human_gate_node(state: TaskState) -> dict:
         bus = get_bus()
-        reason = state.get("escalation_reason", "Unknown escalation")
+        reason = state.get("escalation_reason") or "Unknown escalation"
         if bus:
             bus.node_enter("human_gate", state["task_id"])
             bus.escalation(reason, state["task_id"])
