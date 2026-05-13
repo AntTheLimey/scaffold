@@ -111,9 +111,15 @@ class DoerAgent:
         worktree_path: str | Path,
         prompt: str,
         failure_context: str = "",
+        task_id: str = "",
     ) -> RalphResult:
+        from orchestrator.event_bus import get_bus
+
+        bus = get_bus()
         last_output = ""
         for i in range(1, self.max_iterations + 1):
+            if bus:
+                bus.cli_start(self.role, self.model, i, task_id)
             if i > 1 and last_output:
                 current_prompt = (
                     f"{prompt}\n\n--- PREVIOUS ATTEMPT (iteration {i - 1}) ---\n"
@@ -134,7 +140,10 @@ class DoerAgent:
                 timeout=600,
             )
             last_output = result.stdout
-            if self.completion_promise in result.stdout:
+            success = self.completion_promise in result.stdout
+            if bus:
+                bus.cli_done(self.role, i, success, task_id)
+            if success:
                 return RalphResult(success=True, iterations=i, output=result.stdout)
 
         return RalphResult(success=False, iterations=self.max_iterations, output=last_output)

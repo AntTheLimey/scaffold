@@ -4,6 +4,7 @@ from langgraph.graph import END, START, StateGraph
 
 from orchestrator.agent_loader import AgentLoader
 from orchestrator.config import AgentsConfig
+from orchestrator.event_bus import get_bus
 from orchestrator.nodes.architect import make_architect_node
 from orchestrator.nodes.consensus import make_consensus_node
 from orchestrator.nodes.designer import make_designer_node
@@ -18,48 +19,72 @@ from orchestrator.state import TaskState
 
 def intake_router(state: TaskState) -> str:
     if state.get("escalation_reason"):
-        return "human_gate"
-    level = state["level"]
-    if level == "epic":
-        return "product_owner"
-    if level == "feature":
-        return "architect"
-    return "developer"
+        dest = "human_gate"
+    elif state["level"] == "epic":
+        dest = "product_owner"
+    elif state["level"] == "feature":
+        dest = "architect"
+    else:
+        dest = "developer"
+    bus = get_bus()
+    if bus:
+        bus.route("onboarding", dest, f"level={state['level']}", state["task_id"])
+    return dest
 
 
 def architect_router(state: TaskState) -> str:
     if state.get("escalation_reason"):
-        return "human_gate"
-    if state.get("has_ui_component"):
-        return "designer"
-    return "developer"
+        dest = "human_gate"
+    elif state.get("has_ui_component"):
+        dest = "designer"
+    else:
+        dest = "developer"
+    bus = get_bus()
+    if bus:
+        has_ui = state.get("has_ui_component", False)
+        bus.route("architect", dest, f"has_ui={has_ui}", state["task_id"])
+    return dest
 
 
 def reviewer_router(state: TaskState) -> str:
     if state.get("escalation_reason"):
-        return "human_gate"
-    if state["verdict"] == "approve":
-        return "qa"
-    if state["review_cycles"] >= 3:
-        return "human_gate"
-    return "developer"
+        dest = "human_gate"
+    elif state["verdict"] == "approve":
+        dest = "qa"
+    elif state["review_cycles"] >= 3:
+        dest = "human_gate"
+    else:
+        dest = "developer"
+    bus = get_bus()
+    if bus:
+        reason = f"verdict={state['verdict']} cycles={state['review_cycles']}"
+        bus.route("reviewer", dest, reason, state["task_id"])
+    return dest
 
 
 def qa_router(state: TaskState) -> str:
     if state.get("escalation_reason"):
-        return "human_gate"
-    if state["verdict"] == "pass":
-        return "__end__"
-    if state["bug_cycles"] >= 3:
-        return "human_gate"
-    return "developer"
+        dest = "human_gate"
+    elif state["verdict"] == "pass":
+        dest = "__end__"
+    elif state["bug_cycles"] >= 3:
+        dest = "human_gate"
+    else:
+        dest = "developer"
+    bus = get_bus()
+    if bus:
+        reason = f"verdict={state['verdict']} cycles={state['bug_cycles']}"
+        bus.route("qa", dest, reason, state["task_id"])
+    return dest
 
 
 def human_gate_router(state: TaskState) -> str:
     verdict = state.get("verdict", "")
-    if verdict == "Revise":
-        return "developer"
-    return "__end__"
+    dest = "developer" if verdict == "Revise" else "__end__"
+    bus = get_bus()
+    if bus:
+        bus.route("human_gate", dest, f"verdict={verdict}", state["task_id"])
+    return dest
 
 
 def build_graph(

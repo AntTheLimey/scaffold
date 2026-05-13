@@ -1,5 +1,6 @@
 import sqlite3
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -14,6 +15,12 @@ def db():
     conn.executescript(schema.read_text())
     yield conn
     conn.close()
+
+
+@pytest.fixture(autouse=True)
+def _mock_event_bus():
+    with patch("orchestrator.event_bus._bus", None):
+        yield
 
 
 @pytest.fixture

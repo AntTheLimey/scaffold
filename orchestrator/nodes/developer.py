@@ -3,6 +3,7 @@ from pathlib import Path
 
 from orchestrator.agent_loader import AgentLoader
 from orchestrator.config import AgentsConfig
+from orchestrator.event_bus import get_bus
 from orchestrator.nodes.base import AdvisorAgent, DoerAgent
 from orchestrator.state import TaskState
 
@@ -21,6 +22,9 @@ def make_developer_node(
     client=None,
 ):
     def developer_node(state: TaskState) -> dict:
+        bus = get_bus()
+        if bus:
+            bus.node_enter("developer", state["task_id"], state["level"])
         # 1. Read task context
         agent_output = state.get("agent_output", "")
         specialist_names = state.get("specialists", [])
@@ -54,10 +58,18 @@ def make_developer_node(
                         model=adv_config["model"],
                         client=client,
                     )
+                    tid = state["task_id"]
+                    adv_model = adv_config["model"]
+                    if bus:
+                        bus.api_call_start(adv_name, adv_model, len(agent_output), tid)
                     result = advisor.call(
                         system_prompt=f"You are a {adv_name} advisor.",
                         user_message=f"Review and advise on this task:\n\n{agent_output}",
                     )
+                    if bus:
+                        bus.api_call_done(
+                            adv_name, adv_model, result.token_in, result.token_out, tid
+                        )
                     recommendations.append(result.text)
             if recommendations:
                 advisory_input = "\n\n".join(recommendations)
@@ -87,24 +99,44 @@ def make_developer_node(
 
         # 9. Create worktree, run ralph_loop, cleanup in finally block
         branch = f"{branch_prefix}/{state['task_id']}"
+        if bus:
+            bus.emit(
+                "dev.worktree",
+                agent_role=specialist_name,
+                task_id=state["task_id"],
+                branch=branch,
+            )
         worktree_path = doer.create_worktree(repo_path, branch)
         try:
             result = doer.ralph_loop(
                 worktree_path=worktree_path,
                 prompt=prompt,
                 failure_context=failure_context,
+                task_id=state["task_id"],
             )
         finally:
             doer.cleanup_worktree(repo_path, worktree_path)
 
         # 10. Return result
         if result.success:
+            if bus:
+                bus.node_exit(
+                    "developer",
+                    state["task_id"],
+                    f"success iterations={result.iterations}",
+                )
             return {
                 "status": "in_review",
                 "verdict": "",
                 "feedback": "",
                 "agent_output": result.output,
             }
+        if bus:
+            bus.node_exit(
+                "developer",
+                state["task_id"],
+                f"stuck after {result.iterations} iterations",
+            )
         return {
             "status": "stuck",
             "agent_output": result.output,

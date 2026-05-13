@@ -1,4 +1,5 @@
 from orchestrator.agent_loader import AgentLoader
+from orchestrator.event_bus import get_bus
 from orchestrator.json_utils import extract_json
 from orchestrator.nodes.base import AdvisorAgent
 from orchestrator.state import TaskState
@@ -20,6 +21,9 @@ def make_architect_node(client, agent_loader: AgentLoader, model: str = "claude-
     )
 
     def architect_node(state: TaskState) -> dict:
+        bus = get_bus()
+        if bus:
+            bus.node_enter("architect", state["task_id"], state["level"])
         system_prompt = agent_loader.load_workflow_agent("architect")
         if not system_prompt:
             system_prompt = SYSTEM_PROMPT
@@ -33,18 +37,33 @@ def make_architect_node(client, agent_loader: AgentLoader, model: str = "claude-
             f"Level: {state['level']}\n"
         )
 
+        if bus:
+            bus.api_call_start(
+                "architect", model, len(system_prompt) + len(user_message), state["task_id"]
+            )
         result = agent.call(
             system_prompt=system_prompt,
             user_message=user_message,
             cache_system=True,
         )
+        if bus:
+            bus.api_call_done(
+                "architect", model, result.token_in, result.token_out, state["task_id"]
+            )
 
         parsed = extract_json(result.text)
-        return {
+        output = {
             "has_ui_component": parsed.get("has_ui_component", False),
             "child_tasks": parsed.get("children", []),
             "status": "decomposing",
             "agent_output": result.text,
         }
+        if bus:
+            bus.node_exit(
+                "architect",
+                state["task_id"],
+                f"has_ui={output['has_ui_component']} children={len(output['child_tasks'])}",
+            )
+        return output
 
     return architect_node

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from orchestrator.agent_loader import AgentLoader
+from orchestrator.event_bus import get_bus
 from orchestrator.state import TaskState
 
 # Maps detected language to default specialist name
@@ -196,6 +197,9 @@ def make_onboarding_node(repo_path: str, agents_dir: Path):
     loader = AgentLoader(agents_dir)
 
     def onboarding_node(state: TaskState) -> dict:
+        bus = get_bus()
+        if bus:
+            bus.node_enter("onboarding", state["task_id"], state["level"])
         detection = detect_project(_repo_path)
         available = loader.list_specialists()
 
@@ -227,12 +231,19 @@ def make_onboarding_node(repo_path: str, agents_dir: Path):
         if has_security and auditor_available:
             advisory.append("security-auditor")
 
-        return {
+        result = {
             "specialists": specialists,
             "advisory": advisory,
             "project_context": detection["project_context"],
             "detected_languages": languages,
             "test_framework": detection["test_framework"],
         }
+        if bus:
+            bus.node_exit(
+                "onboarding",
+                state["task_id"],
+                f"langs={languages} specialists={specialists} advisory={advisory}",
+            )
+        return result
 
     return onboarding_node
