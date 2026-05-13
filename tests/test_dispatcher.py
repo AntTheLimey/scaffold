@@ -197,6 +197,23 @@ def test_run_task_parent_blocked_when_child_not_done(db):
     assert parent["status"] == "blocked"
 
 
+def test_run_task_graph_invoke_exception_marks_stuck(db):
+    from orchestrator.task_tree import TaskTree
+
+    tree = TaskTree(db)
+    task_id = tree.create(title="Exploding task", level="task")
+
+    graph = MagicMock()
+    graph.invoke.side_effect = RuntimeError("LLM provider timeout")
+
+    state = initial_state(task_id=task_id, level="task")
+    result = run_task(graph, tree, state, task_id)
+
+    assert result["status"] == "stuck"
+    row = tree.get(task_id)
+    assert row["status"] == "stuck"
+
+
 def test_normalize_acceptance_variants():
     assert _normalize_acceptance(None) == []
     assert _normalize_acceptance(["a", "b"]) == ["a", "b"]

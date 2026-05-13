@@ -42,7 +42,17 @@ def run_task(
             level=state["level"],
         )
 
-    result = graph.invoke(state, config=config)
+    try:
+        result = graph.invoke(state, config=config)
+    except Exception as exc:
+        tree.update_status(state["task_id"], "stuck")
+        if bus:
+            bus.emit(
+                "task.error",
+                task_id=state["task_id"],
+                error=str(exc),
+            )
+        return {"status": "stuck", "child_tasks": []}
 
     children = result.get("child_tasks", [])
     if not children:
