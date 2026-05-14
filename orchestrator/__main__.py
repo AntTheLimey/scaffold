@@ -237,7 +237,10 @@ def report(db, costs, cycles, agents):
         rows = conn.execute("SELECT * FROM epic_costs").fetchall()
         for row in rows:
             total_tokens = row["total_tokens_in"] + row["total_tokens_out"]
-            click.echo(f"{row['epic_title']}: {total_tokens} tokens, {row['total_runs']} runs")
+            wall = format_duration(row["total_wall_clock_ms"])
+            click.echo(
+                f"{row['epic_title']}: {total_tokens} tokens, {row['total_runs']} runs, {wall}"
+            )
     if cycles:
         rows = conn.execute("SELECT * FROM cycle_hotspots").fetchall()
         for row in rows:
@@ -247,9 +250,10 @@ def report(db, costs, cycles, agents):
         for row in rows:
             success_rate = row["success_rate_pct"]
             avg_iters = row["avg_ralph_iterations"]
+            wall = format_duration(row["avg_wall_clock_ms"])
             msg = (
                 f"{row['agent_role']} ({row['model']}): {success_rate:.0f}% success, "
-                f"{avg_iters:.1f} avg iterations"
+                f"{avg_iters:.1f} avg iterations, avg {wall}"
             )
             click.echo(msg)
     if not (costs or cycles or agents):

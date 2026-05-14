@@ -1,3 +1,5 @@
+import sqlite3
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -399,6 +401,45 @@ def test_format_duration_zero():
 
 def test_format_duration_none():
     assert format_duration(None) == "-"
+
+
+def _make_report_db(tmp_path):
+    db_path = tmp_path / "scaffold.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    schema = Path(__file__).parent.parent / "db" / "schema.sql"
+    conn.executescript(schema.read_text())
+    conn.execute(
+        "INSERT INTO tasks (id, level, status, title) "
+        "VALUES ('epic-1', 'epic', 'done', 'Auth Epic')"
+    )
+    conn.execute(
+        "INSERT INTO tasks (id, parent_id, level, status, title) "
+        "VALUES ('task-1', 'epic-1', 'task', 'done', 'Implement login')"
+    )
+    conn.execute(
+        "INSERT INTO agent_runs (id, task_id, agent_role, model, started_at, finished_at, "
+        "iterations, token_in, token_out, outcome) VALUES "
+        "('run-1', 'task-1', 'developer', 'claude-sonnet-4-6', "
+        "'2026-05-13T10:00:00', '2026-05-13T10:04:12', 1, 5000, 2000, 'success')"
+    )
+    conn.commit()
+    conn.close()
+    return db_path
+
+
+def test_report_agents_shows_wallclock(runner, tmp_path):
+    db_path = _make_report_db(tmp_path)
+    result = runner.invoke(cli, ["report", "--agents", "--db", str(db_path)])
+    assert result.exit_code == 0
+    assert "4m" in result.output
+
+
+def test_report_costs_shows_wallclock(runner, tmp_path):
+    db_path = _make_report_db(tmp_path)
+    result = runner.invoke(cli, ["report", "--costs", "--db", str(db_path)])
+    assert result.exit_code == 0
+    assert "4m" in result.output
 
 
 def test_cli_run_project_not_found(runner, tmp_path):
