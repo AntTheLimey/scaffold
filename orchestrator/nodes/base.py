@@ -1,6 +1,41 @@
+import json as _json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+
+
+@dataclass
+class CliOutput:
+    result_text: str
+    tool_names: list[str]
+    cost_usd: float | None
+
+
+def parse_cli_output(stdout: str) -> CliOutput:
+    tool_names: list[str] = []
+    result_text: str | None = None
+    cost_usd: float | None = None
+    found_jsonl = False
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = _json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        found_jsonl = True
+        obj_type = obj.get("type")
+        if obj_type == "assistant":
+            for block in obj.get("message", {}).get("content", []):
+                if block.get("type") == "tool_use":
+                    tool_names.append(block["name"])
+        elif obj_type == "result":
+            result_text = obj.get("result", "")
+            cost_usd = obj.get("total_cost_usd")
+    if not found_jsonl or result_text is None:
+        return CliOutput(result_text=stdout, tool_names=[], cost_usd=None)
+    return CliOutput(result_text=result_text, tool_names=tool_names, cost_usd=cost_usd)
 
 
 @dataclass

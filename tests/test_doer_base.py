@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from orchestrator.nodes.base import DoerAgent
+from orchestrator.nodes.base import DoerAgent, parse_cli_output
 
 
 @pytest.fixture
@@ -88,3 +88,62 @@ def test_doer_injects_failure_context_on_retry(mock_run, doer):
     prompt_arg = second_call.args[0][-1]
     assert "PREVIOUS ATTEMPT" in prompt_arg
     assert "Error: module not found" in prompt_arg
+
+
+_READ_CALL = (
+    '{"type":"assistant","message":{"content":'
+    '[{"type":"tool_use","name":"Read","id":"t1","input":{"file_path":"/tmp/f.py"}}]}}'
+)
+_EDIT_CALL = (
+    '{"type":"assistant","message":{"content":'
+    '[{"type":"tool_use","name":"Edit","id":"t2",'
+    '"input":{"file_path":"/tmp/f.py","old_string":"a","new_string":"b"}}]}}'
+)
+_TEXT_MSG = (
+    '{"type":"assistant","message":{"content":[{"type":"text","text":"Done.\\nTASK COMPLETE"}]}}'
+)
+SAMPLE_JSONL = "\n".join(
+    [
+        '{"type":"system","subtype":"init","session_id":"abc"}',
+        _READ_CALL,
+        '{"type":"user","subtype":"tool_result"}',
+        _EDIT_CALL,
+        '{"type":"user","subtype":"tool_result"}',
+        _TEXT_MSG,
+        '{"type":"result","result":"Done.\\nTASK COMPLETE","num_turns":3,"total_cost_usd":0.12}',
+    ]
+)
+
+
+def test_parse_cli_output_extracts_tool_names():
+    output = parse_cli_output(SAMPLE_JSONL)
+    assert output.tool_names == ["Read", "Edit"]
+
+
+def test_parse_cli_output_extracts_result_text():
+    output = parse_cli_output(SAMPLE_JSONL)
+    assert "TASK COMPLETE" in output.result_text
+
+
+def test_parse_cli_output_extracts_cost():
+    output = parse_cli_output(SAMPLE_JSONL)
+    assert output.cost_usd == pytest.approx(0.12)
+
+
+def test_parse_cli_output_fallback_on_invalid_json():
+    raw = "This is plain text output.\nTASK COMPLETE"
+    output = parse_cli_output(raw)
+    assert output.result_text == raw
+    assert output.tool_names == []
+    assert output.cost_usd is None
+
+
+def test_parse_cli_output_fallback_on_missing_result_line():
+    partial = (
+        '{"type":"system","subtype":"init"}\n'
+        '{"type":"assistant","message":{"content":[{"type":"text","text":"hello"}]}}'
+    )
+    output = parse_cli_output(partial)
+    assert output.result_text == partial
+    assert output.tool_names == []
+    assert output.cost_usd is None
