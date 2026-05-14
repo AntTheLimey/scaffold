@@ -31,9 +31,19 @@ def parse_cli_output(stdout: str) -> CliOutput:
         found_jsonl = True
         obj_type = obj.get("type")
         if obj_type == "assistant":
-            for block in obj.get("message", {}).get("content", []):
-                if block.get("type") == "tool_use" and "name" in block:
-                    tool_names.append(block["name"])
+            message = obj.get("message")
+            if not isinstance(message, dict):
+                continue
+            content = message.get("content")
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "tool_use":
+                    name = block.get("name")
+                    if isinstance(name, str):
+                        tool_names.append(name)
         elif obj_type == "result":
             result_text = obj.get("result", "")
             cost_usd = obj.get("total_cost_usd")
