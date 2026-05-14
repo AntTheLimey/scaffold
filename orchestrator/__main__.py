@@ -207,6 +207,21 @@ def init(repo_path, config):
     )
 
 
+def format_duration(ms: int | None) -> str:
+    if ms is None:
+        return "-"
+    total_seconds = int(ms / 1000)
+    if total_seconds < 60:
+        return f"{total_seconds}s"
+    minutes = total_seconds // 60
+    seconds = total_seconds % 60
+    if minutes < 60:
+        return f"{minutes}m {seconds:02d}s"
+    hours = minutes // 60
+    remaining_minutes = minutes % 60
+    return f"{hours}h {remaining_minutes:02d}m"
+
+
 @cli.command()
 @click.option("--db", default="scaffold.db", help="Path to scaffold database")
 @click.option("--costs", is_flag=True, help="Show cost breakdown by epic")

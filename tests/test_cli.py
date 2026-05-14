@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from orchestrator.__main__ import cli
+from orchestrator.__main__ import cli, format_duration
 
 
 @pytest.fixture
@@ -379,6 +379,26 @@ def test_cli_run_with_project(runner, tmp_path):
             ],
         )
         assert result.exit_code == 0
+
+
+def test_format_duration_seconds():
+    assert format_duration(45000) == "45s"
+
+
+def test_format_duration_minutes():
+    assert format_duration(154000) == "2m 34s"
+
+
+def test_format_duration_hours():
+    assert format_duration(4320000) == "1h 12m"
+
+
+def test_format_duration_zero():
+    assert format_duration(0) == "0s"
+
+
+def test_format_duration_none():
+    assert format_duration(None) == "-"
 
 
 def test_cli_run_project_not_found(runner, tmp_path):
