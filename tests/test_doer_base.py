@@ -147,3 +147,76 @@ def test_parse_cli_output_fallback_on_missing_result_line():
     assert output.result_text == partial
     assert output.tool_names == []
     assert output.cost_usd is None
+
+
+_STREAM_READ = (
+    '{"type":"assistant","message":{"content":'
+    '[{"type":"tool_use","name":"Read","id":"t1","input":{"file_path":"/tmp/f.py"}}]}}'
+)
+_STREAM_EDIT = (
+    '{"type":"assistant","message":{"content":'
+    '[{"type":"tool_use","name":"Edit","id":"t2",'
+    '"input":{"file_path":"/tmp/f.py","old_string":"a","new_string":"b"}}]}}'
+)
+_STREAM_TEXT = (
+    '{"type":"assistant","message":{"content":[{"type":"text","text":"Done.\\nTASK COMPLETE"}]}}'
+)
+_STREAM_RESULT = (
+    '{"type":"result","result":"Done.\\nTASK COMPLETE","num_turns":2,"total_cost_usd":0.05}'
+)
+STREAM_JSON_SUCCESS = "\n".join([_STREAM_READ, _STREAM_EDIT, _STREAM_TEXT, _STREAM_RESULT])
+
+
+@patch("orchestrator.nodes.base.subprocess.run")
+def test_doer_uses_stream_json_format(mock_run, doer):
+    mock_run.return_value = MagicMock(
+        stdout=STREAM_JSON_SUCCESS,
+        stderr="",
+        returncode=0,
+    )
+    doer.ralph_loop(worktree_path="/tmp/wt", prompt="Do the thing")
+    cmd = mock_run.call_args.args[0]
+    assert "--output-format" in cmd
+    assert "stream-json" in cmd
+    assert "--verbose" in cmd
+
+
+@patch("orchestrator.nodes.base.subprocess.run")
+def test_doer_detects_promise_from_jsonl(mock_run, doer):
+    mock_run.return_value = MagicMock(
+        stdout=STREAM_JSON_SUCCESS,
+        stderr="",
+        returncode=0,
+    )
+    result = doer.ralph_loop(worktree_path="/tmp/wt", prompt="Do the thing")
+    assert result.success is True
+    assert result.iterations == 1
+    assert "TASK COMPLETE" in result.output
+
+
+@patch("orchestrator.nodes.base.subprocess.run")
+def test_doer_emits_tool_call_events(mock_run, doer):
+    mock_run.return_value = MagicMock(
+        stdout=STREAM_JSON_SUCCESS,
+        stderr="",
+        returncode=0,
+    )
+    mock_bus = MagicMock()
+    with patch("orchestrator.nodes.base.get_bus", return_value=mock_bus):
+        doer.ralph_loop(worktree_path="/tmp/wt", prompt="Do it", task_id="t-1")
+    tool_calls = [c for c in mock_bus.method_calls if c[0] == "tool_call"]
+    assert len(tool_calls) == 2
+    assert tool_calls[0].args == ("developer", "Read", "t-1")
+    assert tool_calls[1].args == ("developer", "Edit", "t-1")
+
+
+@patch("orchestrator.nodes.base.subprocess.run")
+def test_doer_falls_back_on_plain_text_output(mock_run, doer):
+    mock_run.return_value = MagicMock(
+        stdout="Plain text output.\nTASK COMPLETE",
+        stderr="",
+        returncode=0,
+    )
+    result = doer.ralph_loop(worktree_path="/tmp/wt", prompt="Do it")
+    assert result.success is True
+    assert result.output == "Plain text output.\nTASK COMPLETE"

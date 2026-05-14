@@ -3,6 +3,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from orchestrator.event_bus import get_bus
+
 
 @dataclass
 class CliOutput:
@@ -148,8 +150,6 @@ class DoerAgent:
         failure_context: str = "",
         task_id: str = "",
     ) -> RalphResult:
-        from orchestrator.event_bus import get_bus
-
         bus = get_bus()
         last_output = ""
         for i in range(1, self.max_iterations + 1):
@@ -170,18 +170,31 @@ class DoerAgent:
             success = False
             try:
                 result = subprocess.run(
-                    ["claude", "--model", self.model, "-p", current_prompt],
+                    [
+                        "claude",
+                        "--model",
+                        self.model,
+                        "--output-format",
+                        "stream-json",
+                        "--verbose",
+                        "-p",
+                        current_prompt,
+                    ],
                     capture_output=True,
                     text=True,
                     cwd=str(worktree_path),
                     timeout=600,
                 )
-                last_output = result.stdout
-                success = self.completion_promise in result.stdout
+                parsed = parse_cli_output(result.stdout)
+                last_output = parsed.result_text
+                success = self.completion_promise in parsed.result_text
+                if bus:
+                    for tool_name in parsed.tool_names:
+                        bus.tool_call(self.role, tool_name, task_id)
             finally:
                 if bus:
                     bus.cli_done(self.role, i, success, task_id)
             if success:
-                return RalphResult(success=True, iterations=i, output=result.stdout)
+                return RalphResult(success=True, iterations=i, output=parsed.result_text)
 
         return RalphResult(success=False, iterations=self.max_iterations, output=last_output)
