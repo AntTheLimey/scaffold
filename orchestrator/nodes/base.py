@@ -3,6 +3,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+import click
+
 from orchestrator.event_bus import get_bus
 
 
@@ -30,7 +32,7 @@ def parse_cli_output(stdout: str) -> CliOutput:
         obj_type = obj.get("type")
         if obj_type == "assistant":
             for block in obj.get("message", {}).get("content", []):
-                if block.get("type") == "tool_use":
+                if block.get("type") == "tool_use" and "name" in block:
                     tool_names.append(block["name"])
         elif obj_type == "result":
             result_text = obj.get("result", "")
@@ -186,6 +188,11 @@ class DoerAgent:
                     timeout=600,
                 )
                 parsed = parse_cli_output(result.stdout)
+                if result.stdout and not parsed.tool_names and parsed.cost_usd is None:
+                    click.echo(
+                        f"[{self.role}] JSONL parse fallback — tool calls not logged",
+                        err=True,
+                    )
                 last_output = parsed.result_text
                 success = self.completion_promise in parsed.result_text
                 if bus:
