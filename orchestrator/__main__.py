@@ -227,7 +227,8 @@ def format_duration(ms: int | None) -> str:
 @click.option("--costs", is_flag=True, help="Show cost breakdown by epic")
 @click.option("--cycles", is_flag=True, help="Show cycle hotspots")
 @click.option("--agents", is_flag=True, help="Show agent efficiency metrics")
-def report(db, costs, cycles, agents):
+@click.option("--tools", is_flag=True, help="Show tool usage by agent")
+def report(db, costs, cycles, agents, tools):
     """Show scaffold metrics and status."""
     if not Path(db).exists():
         click.echo("No database found.")
@@ -256,7 +257,18 @@ def report(db, costs, cycles, agents):
                 f"{avg_iters:.1f} avg iterations, avg {wall}"
             )
             click.echo(msg)
-    if not (costs or cycles or agents):
+    if tools:
+        rows = conn.execute("SELECT * FROM tool_usage").fetchall()
+        if not rows:
+            click.echo("No tool usage recorded.")
+        else:
+            current_role = None
+            for row in rows:
+                if row["agent_role"] != current_role:
+                    current_role = row["agent_role"]
+                    click.echo(f"{current_role}:")
+                click.echo(f"  {row['tool_name']:<12} {row['call_count']}")
+    if not (costs or cycles or agents or tools):
         total = conn.execute("SELECT COUNT(*) as cnt FROM tasks").fetchone()["cnt"]
         done_query = "SELECT COUNT(*) as cnt FROM tasks WHERE status='done'"
         done = conn.execute(done_query).fetchone()["cnt"]

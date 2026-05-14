@@ -442,6 +442,37 @@ def test_report_costs_shows_wallclock(runner, tmp_path):
     assert "4m" in result.output
 
 
+def test_report_tools_shows_usage(runner, tmp_path):
+    db_path = _make_report_db(tmp_path)
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        "INSERT INTO events (id, task_id, agent_role, event_type, event_data) "
+        "VALUES ('e1', 'task-1', 'developer', 'tool.call', '{\"tool_name\": \"Edit\"}')"
+    )
+    conn.execute(
+        "INSERT INTO events (id, task_id, agent_role, event_type, event_data) "
+        "VALUES ('e2', 'task-1', 'developer', 'tool.call', '{\"tool_name\": \"Edit\"}')"
+    )
+    conn.execute(
+        "INSERT INTO events (id, task_id, agent_role, event_type, event_data) "
+        "VALUES ('e3', 'task-1', 'developer', 'tool.call', '{\"tool_name\": \"Read\"}')"
+    )
+    conn.commit()
+    conn.close()
+    result = runner.invoke(cli, ["report", "--tools", "--db", str(db_path)])
+    assert result.exit_code == 0
+    assert "developer" in result.output
+    assert "Edit" in result.output
+    assert "Read" in result.output
+
+
+def test_report_tools_empty(runner, tmp_path):
+    db_path = _make_report_db(tmp_path)
+    result = runner.invoke(cli, ["report", "--tools", "--db", str(db_path)])
+    assert result.exit_code == 0
+    assert "No tool" in result.output
+
+
 def test_cli_run_project_not_found(runner, tmp_path):
     spec = tmp_path / "spec.md"
     spec.write_text("# Test Spec")
