@@ -1,6 +1,55 @@
+import json as _json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+
+import click
+
+from orchestrator.event_bus import get_bus
+
+
+@dataclass
+class CliOutput:
+    result_text: str
+    tool_names: list[str]
+    cost_usd: float | None
+
+
+def parse_cli_output(stdout: str) -> CliOutput:
+    tool_names: list[str] = []
+    result_text: str | None = None
+    cost_usd: float | None = None
+    found_jsonl = False
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = _json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        found_jsonl = True
+        obj_type = obj.get("type")
+        if obj_type == "assistant":
+            message = obj.get("message")
+            if not isinstance(message, dict):
+                continue
+            content = message.get("content")
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "tool_use":
+                    name = block.get("name")
+                    if isinstance(name, str):
+                        tool_names.append(name)
+        elif obj_type == "result":
+            result_text = obj.get("result", "")
+            cost_usd = obj.get("total_cost_usd")
+    if not found_jsonl or result_text is None:
+        return CliOutput(result_text=stdout, tool_names=[], cost_usd=None)
+    return CliOutput(result_text=result_text, tool_names=tool_names, cost_usd=cost_usd)
 
 
 @dataclass
@@ -113,8 +162,6 @@ class DoerAgent:
         failure_context: str = "",
         task_id: str = "",
     ) -> RalphResult:
-        from orchestrator.event_bus import get_bus
-
         bus = get_bus()
         last_output = ""
         for i in range(1, self.max_iterations + 1):
@@ -135,18 +182,36 @@ class DoerAgent:
             success = False
             try:
                 result = subprocess.run(
-                    ["claude", "--model", self.model, "-p", current_prompt],
+                    [
+                        "claude",
+                        "--model",
+                        self.model,
+                        "--output-format",
+                        "stream-json",
+                        "--verbose",
+                        "-p",
+                        current_prompt,
+                    ],
                     capture_output=True,
                     text=True,
                     cwd=str(worktree_path),
                     timeout=600,
                 )
-                last_output = result.stdout
-                success = self.completion_promise in result.stdout
+                parsed = parse_cli_output(result.stdout)
+                if result.stdout and not parsed.tool_names and parsed.cost_usd is None:
+                    click.echo(
+                        f"[{self.role}] JSONL parse fallback — tool calls not logged",
+                        err=True,
+                    )
+                last_output = parsed.result_text
+                success = self.completion_promise in parsed.result_text
+                if bus:
+                    for tool_name in parsed.tool_names:
+                        bus.tool_call(self.role, tool_name, task_id)
             finally:
                 if bus:
                     bus.cli_done(self.role, i, success, task_id)
             if success:
-                return RalphResult(success=True, iterations=i, output=result.stdout)
+                return RalphResult(success=True, iterations=i, output=parsed.result_text)
 
         return RalphResult(success=False, iterations=self.max_iterations, output=last_output)

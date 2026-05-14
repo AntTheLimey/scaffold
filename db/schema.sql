@@ -70,6 +70,8 @@ SELECT
     t.parent_id as epic_id,
     SUM(ar.token_in) as total_tokens_in,
     SUM(ar.token_out) as total_tokens_out,
+    SUM(CAST((julianday(ar.finished_at) - julianday(ar.started_at)) * 86400000 AS INTEGER))
+        as total_wall_clock_ms,
     COUNT(DISTINCT ar.id) as total_runs,
     COUNT(DISTINCT t.id) as total_tasks
 FROM tasks t
@@ -99,3 +101,13 @@ SELECT
 FROM agent_runs
 WHERE finished_at IS NOT NULL
 GROUP BY agent_role, model;
+
+CREATE VIEW IF NOT EXISTS tool_usage AS
+SELECT
+    agent_role,
+    json_extract(event_data, '$.tool_name') as tool_name,
+    COUNT(*) as call_count
+FROM events
+WHERE event_type = 'tool.call'
+GROUP BY agent_role, json_extract(event_data, '$.tool_name')
+ORDER BY agent_role, call_count DESC;

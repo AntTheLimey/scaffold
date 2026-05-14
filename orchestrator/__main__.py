@@ -207,12 +207,28 @@ def init(repo_path, config):
     )
 
 
+def format_duration(ms: int | None) -> str:
+    if ms is None:
+        return "-"
+    total_seconds = int(ms / 1000)
+    if total_seconds < 60:
+        return f"{total_seconds}s"
+    minutes = total_seconds // 60
+    seconds = total_seconds % 60
+    if minutes < 60:
+        return f"{minutes}m {seconds:02d}s"
+    hours = minutes // 60
+    remaining_minutes = minutes % 60
+    return f"{hours}h {remaining_minutes:02d}m"
+
+
 @cli.command()
 @click.option("--db", default="scaffold.db", help="Path to scaffold database")
 @click.option("--costs", is_flag=True, help="Show cost breakdown by epic")
 @click.option("--cycles", is_flag=True, help="Show cycle hotspots")
 @click.option("--agents", is_flag=True, help="Show agent efficiency metrics")
-def report(db, costs, cycles, agents):
+@click.option("--tools", is_flag=True, help="Show tool usage by agent")
+def report(db, costs, cycles, agents, tools):
     """Show scaffold metrics and status."""
     if not Path(db).exists():
         click.echo("No database found.")
@@ -222,7 +238,10 @@ def report(db, costs, cycles, agents):
         rows = conn.execute("SELECT * FROM epic_costs").fetchall()
         for row in rows:
             total_tokens = row["total_tokens_in"] + row["total_tokens_out"]
-            click.echo(f"{row['epic_title']}: {total_tokens} tokens, {row['total_runs']} runs")
+            wall = format_duration(row["total_wall_clock_ms"])
+            click.echo(
+                f"{row['epic_title']}: {total_tokens} tokens, {row['total_runs']} runs, {wall}"
+            )
     if cycles:
         rows = conn.execute("SELECT * FROM cycle_hotspots").fetchall()
         for row in rows:
@@ -232,12 +251,24 @@ def report(db, costs, cycles, agents):
         for row in rows:
             success_rate = row["success_rate_pct"]
             avg_iters = row["avg_ralph_iterations"]
+            wall = format_duration(row["avg_wall_clock_ms"])
             msg = (
                 f"{row['agent_role']} ({row['model']}): {success_rate:.0f}% success, "
-                f"{avg_iters:.1f} avg iterations"
+                f"{avg_iters:.1f} avg iterations, avg {wall}"
             )
             click.echo(msg)
-    if not (costs or cycles or agents):
+    if tools:
+        rows = conn.execute("SELECT * FROM tool_usage").fetchall()
+        if not rows:
+            click.echo("No tool usage recorded.")
+        else:
+            current_role = None
+            for row in rows:
+                if row["agent_role"] != current_role:
+                    current_role = row["agent_role"]
+                    click.echo(f"{current_role}:")
+                click.echo(f"  {row['tool_name']:<12} {row['call_count']}")
+    if not (costs or cycles or agents or tools):
         total = conn.execute("SELECT COUNT(*) as cnt FROM tasks").fetchone()["cnt"]
         done_query = "SELECT COUNT(*) as cnt FROM tasks WHERE status='done'"
         done = conn.execute(done_query).fetchone()["cnt"]

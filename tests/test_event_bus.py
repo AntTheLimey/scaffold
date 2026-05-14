@@ -149,3 +149,28 @@ def test_init_event_bus_sets_singleton():
         assert get_bus() is bus
     finally:
         eb._bus = old
+
+
+def test_tool_call_event():
+    conn = _make_db()
+    bus = EventBus(conn)
+    with patch("orchestrator.event_bus.click"):
+        bus.tool_call("developer", "Edit", "t-10", run_id="run-1")
+    events = _get_events(conn)
+    assert len(events) == 1
+    assert events[0]["event_type"] == "tool.call"
+    assert events[0]["agent_role"] == "developer"
+    data = json.loads(events[0]["event_data"])
+    assert data["tool_name"] == "Edit"
+
+
+def test_tool_call_event_without_run_id():
+    conn = _make_db()
+    bus = EventBus(conn)
+    with patch("orchestrator.event_bus.click"):
+        bus.tool_call("developer", "Bash", "t-11")
+    events = _get_events(conn)
+    assert len(events) == 1
+    assert events[0]["run_id"] is None
+    data = json.loads(events[0]["event_data"])
+    assert data["tool_name"] == "Bash"

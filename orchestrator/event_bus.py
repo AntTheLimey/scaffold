@@ -103,6 +103,21 @@ class EventBus:
     def escalation(self, reason: str, task_id: str) -> None:
         self.emit("agent.escalate", task_id=task_id, reason=reason)
 
+    def tool_call(
+        self,
+        agent_role: str,
+        tool_name: str,
+        task_id: str,
+        run_id: str | None = None,
+    ) -> None:
+        self.emit(
+            "tool.call",
+            agent_role=agent_role,
+            task_id=task_id,
+            run_id=run_id,
+            tool_name=tool_name,
+        )
+
 
 def init_event_bus(conn: sqlite3.Connection) -> EventBus:
     global _bus
