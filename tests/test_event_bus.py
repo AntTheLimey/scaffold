@@ -200,17 +200,24 @@ def test_cli_done_without_cost_usd():
     assert "cost_usd" not in data
 
 
-def test_check_budget_passes_when_under_limit():
-    conn = _make_db()
-    bus = EventBus(conn)
+def _insert_task(db, task_id):
+    db.execute(
+        "INSERT INTO tasks (id, level, status, title) VALUES (?, 'task', 'pending', 'test')",
+        (task_id,),
+    )
+
+
+def test_check_budget_passes_when_under_limit(db):
+    _insert_task(db, "t-14")
+    bus = EventBus(db)
     with patch("orchestrator.event_bus.click"):
         bus.cli_done("developer", 1, True, "t-14", cost_usd=0.10)
     bus.check_budget(5.00)
 
 
-def test_check_budget_raises_when_over_limit():
-    conn = _make_db()
-    bus = EventBus(conn)
+def test_check_budget_raises_when_over_limit(db):
+    _insert_task(db, "t-15")
+    bus = EventBus(db)
     with patch("orchestrator.event_bus.click"):
         bus.cli_done("developer", 1, True, "t-15", cost_usd=3.00)
         bus.cli_done("developer", 2, True, "t-15", cost_usd=3.00)

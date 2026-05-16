@@ -110,12 +110,14 @@ class DoerAgent:
         max_iterations: int = 10,
         completion_promise: str = "TASK COMPLETE",
         max_budget_usd: float | None = None,
+        timeout: int = 600,
     ):
         self.role = role
         self.model = model
         self.max_iterations = max_iterations
         self.completion_promise = completion_promise
         self.max_budget_usd = max_budget_usd
+        self.timeout = timeout
 
     def create_worktree(self, repo_path: Path | str, branch: str) -> Path:
         repo_path = Path(repo_path)
@@ -202,7 +204,7 @@ class DoerAgent:
                     capture_output=True,
                     text=True,
                     cwd=str(worktree_path),
-                    timeout=600,
+                    timeout=self.timeout,
                 )
                 parsed = parse_cli_output(result.stdout)
                 if result.stdout and not parsed.tool_names and parsed.cost_usd is None:

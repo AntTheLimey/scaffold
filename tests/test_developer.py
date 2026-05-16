@@ -90,6 +90,7 @@ def test_developer_dispatches_correct_specialist(
         max_iterations=8,
         completion_promise="TASK COMPLETE",
         max_budget_usd=None,
+        timeout=600,
     )
 
 
@@ -117,6 +118,7 @@ def test_developer_matches_specialist_by_file_type(
         max_iterations=8,
         completion_promise="TASK COMPLETE",
         max_budget_usd=None,
+        timeout=600,
     )
 
 
@@ -151,6 +153,7 @@ def test_developer_detects_specialist_from_agent_output(
         max_iterations=10,
         completion_promise="TASK COMPLETE",
         max_budget_usd=None,
+        timeout=600,
     )
 
 
@@ -297,6 +300,7 @@ def test_developer_fallback_to_python_expert(mock_doer, mock_advisor, agent_load
         max_iterations=10,
         completion_promise="TASK COMPLETE",
         max_budget_usd=None,
+        timeout=600,
     )
 
 
@@ -320,6 +324,7 @@ def test_developer_passes_max_budget_to_doer(mock_doer, mock_advisor, agent_load
         max_iterations=10,
         completion_promise="TASK COMPLETE",
         max_budget_usd=2.00,
+        timeout=600,
     )
 
 
@@ -360,6 +365,66 @@ def test_developer_no_scaffold_budget_by_default(
 
     ralph_call = mock_doer.return_value.ralph_loop.call_args
     assert ralph_call.kwargs.get("scaffold_budget_usd") is None
+
+
+def test_developer_rejects_documentation_writer_when_roster_empty(
+    mock_doer, mock_advisor, agent_loader, agents_config
+):
+    """Developer should not auto-select documentation-writer when specialist roster is empty."""
+    agents_config.specialists["documentation-writer"] = {
+        "model": "claude-sonnet-4-6",
+        "execution": "cli",
+        "max_iterations": 5,
+        "completion_promise": "TASK COMPLETE",
+    }
+    agent_loader.detect_specialist.return_value = "documentation-writer"
+
+    node_fn = make_developer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        agent_loader=agent_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-013", level="task")
+    state["specialists"] = []
+    state["agent_output"] = "Create README.md and docs/architecture.md"
+
+    node_fn(state)
+
+    mock_doer.assert_called_once_with(
+        role="python-expert",
+        model="claude-sonnet-4-6",
+        max_iterations=10,
+        completion_promise="TASK COMPLETE",
+        max_budget_usd=None,
+        timeout=600,
+    )
+
+
+def test_developer_passes_timeout_from_config(mock_doer, mock_advisor, agent_loader, agents_config):
+    """Developer passes timeout from specialist config to DoerAgent."""
+    agents_config.specialists["python-expert"]["timeout"] = 900
+
+    node_fn = make_developer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        agent_loader=agent_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-014", level="task")
+    state["specialists"] = ["python-expert"]
+    state["agent_output"] = "Update main.py"
+
+    node_fn(state)
+
+    mock_doer.assert_called_once_with(
+        role="python-expert",
+        model="claude-sonnet-4-6",
+        max_iterations=10,
+        completion_promise="TASK COMPLETE",
+        max_budget_usd=None,
+        timeout=900,
+    )
 
 
 def test_extract_file_paths():

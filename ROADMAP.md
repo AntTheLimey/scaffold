@@ -42,6 +42,8 @@ Items are force-ranked by score. Higher score = do first.
 | Checkpoint resume UX | 3 | 2 | M (2) | 4.0 | Idea | Current resume requires knowing the thread ID and re-running with the right flags. Add `scaffold resume` that lists interrupted runs and lets you pick one. |
 | Human gate improvements | 3 | 2 | M (2) | 4.0 | Idea | Human gate currently escalates via Telegram. Add interactive terminal mode, approval timeouts, and context summaries so the operator can make informed decisions. |
 | Web dashboard + control plane | 5 | 4 | XL (4) | 3.5 | Idea | Web-based UI (lightweight Python web server) to monitor runs in real time, view agent events/tool calls/costs, inspect task trees, manage human gate approvals, and trigger/resume runs. Replaces CLI as the primary operator interface. |
+| Run isolation + stale cleanup | 3 | 3 | M (2) | 4.5 | Idea | `scaffold run` creates a new Root task but shares the DB with previous runs. Budget scoping counts all historical spend, not just the current run. Add a `run_id` concept that tags tasks/events per run, scope budget checks to the active run, and add `scaffold cleanup` to purge stale/abandoned runs. |
+| API cost tracking (Opus/advisor) | 4 | 4 | M (2) | 6.0 | Idea | Anthropic SDK returns token counts but not dollar amounts. Workflow agents (product_owner, architect, consensus) and advisory specialists (postgres-expert, security-auditor) run via API — their costs are invisible to the budget system. Add model pricing table + token-to-dollar conversion in api_call_done events. |
 | End-to-end integration test | 4 | 3 | L (3) | 3.7 | Idea | Run the full pipeline against a trivial test repo with mocked API/CLI responses. Current tests are unit-level only — no test covers the full graph traversal. |
 
 ## Completed

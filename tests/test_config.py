@@ -130,6 +130,44 @@ def test_project_config_max_budget_usd_defaults_none(config_dir):
     assert cfg.project.max_budget_usd is None
 
 
+def test_project_config_rejects_negative_budget(tmp_path):
+    governance = tmp_path / "governance.yaml"
+    governance.write_text("rapid: {}\nraci: {}\n")
+    agents = tmp_path / "agents.yaml"
+    agents.write_text("workflow: {}\nspecialists: {}\nescalation: {}\n")
+    project = tmp_path / "project.yaml"
+    project.write_text(
+        "repo_path: /tmp/test\n"
+        "branch_prefix: scaffold\n"
+        "max_concurrent_agents: 3\n"
+        "db_path: ':memory:'\n"
+        "max_budget_usd: -1.00\n"
+    )
+    import pytest
+
+    with pytest.raises(ValueError, match="must be positive"):
+        load_config(str(tmp_path))
+
+
+def test_project_config_rejects_unknown_keys(tmp_path):
+    governance = tmp_path / "governance.yaml"
+    governance.write_text("rapid: {}\nraci: {}\n")
+    agents = tmp_path / "agents.yaml"
+    agents.write_text("workflow: {}\nspecialists: {}\nescalation: {}\n")
+    project = tmp_path / "project.yaml"
+    project.write_text(
+        "repo_path: /tmp/test\n"
+        "branch_prefix: scaffold\n"
+        "max_concurrent_agents: 3\n"
+        "db_path: ':memory:'\n"
+        "bogus_key: true\n"
+    )
+    import pytest
+
+    with pytest.raises(ValueError, match="Unknown project config keys"):
+        load_config(str(tmp_path))
+
+
 def test_load_config_project_not_found(tmp_path):
     governance = tmp_path / "governance.yaml"
     governance.write_text("rapid: {}\nraci: {}\n")

@@ -1,11 +1,10 @@
-import sqlite3
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
 from orchestrator.__main__ import cli, format_duration
+from orchestrator.db import get_connection, init_db
 
 
 @pytest.fixture
@@ -405,10 +404,7 @@ def test_format_duration_none():
 
 def _make_report_db(tmp_path):
     db_path = tmp_path / "scaffold.db"
-    conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
-    schema = Path(__file__).parent.parent / "db" / "schema.sql"
-    conn.executescript(schema.read_text())
+    conn = init_db(str(db_path))
     conn.execute(
         "INSERT INTO tasks (id, level, status, title) "
         "VALUES ('epic-1', 'epic', 'done', 'Auth Epic')"
@@ -444,7 +440,7 @@ def test_report_costs_shows_wallclock(runner, tmp_path):
 
 def test_report_tools_shows_usage(runner, tmp_path):
     db_path = _make_report_db(tmp_path)
-    conn = sqlite3.connect(str(db_path))
+    conn = get_connection(str(db_path))
     conn.execute(
         "INSERT INTO events (id, task_id, agent_role, event_type, event_data) "
         "VALUES ('e1', 'task-1', 'developer', 'tool.call', '{\"tool_name\": \"Edit\"}')"
@@ -475,7 +471,7 @@ def test_report_tools_empty(runner, tmp_path):
 
 def test_report_costs_shows_cumulative_spend(runner, tmp_path):
     db_path = _make_report_db(tmp_path)
-    conn = sqlite3.connect(str(db_path))
+    conn = get_connection(str(db_path))
     conn.execute(
         "INSERT INTO events (id, task_id, agent_role, event_type, event_data) "
         "VALUES ('e1', 'task-1', 'developer', 'cli.done', "
@@ -516,3 +512,26 @@ def test_cli_run_project_not_found(runner, tmp_path):
         ],
     )
     assert result.exit_code != 0
+
+
+def test_cli_run_budget_exceeded_exits_nonzero(runner, tmp_path, config_dir):
+    spec = tmp_path / "spec.md"
+    spec.write_text("# Test Spec")
+    from orchestrator.budget import BudgetExceededError
+
+    with (
+        patch("orchestrator.__main__.build_graph"),
+        patch("orchestrator.__main__.TelegramBot"),
+        patch("orchestrator.__main__.SqliteSaver"),
+        patch("orchestrator.__main__.AgentLoader"),
+        patch("orchestrator.__main__.run_preflight") as mock_preflight,
+        patch("orchestrator.__main__.run_task") as mock_run_task,
+    ):
+        mock_preflight.return_value.ok = True
+        mock_run_task.side_effect = BudgetExceededError(spent=5.50, limit=5.00)
+        result = runner.invoke(
+            cli,
+            ["run", "--spec", str(spec), "--config", str(config_dir)],
+        )
+    assert result.exit_code == 2
+    assert "Budget exceeded" in result.output

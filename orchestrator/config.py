@@ -17,6 +17,15 @@ class AgentsConfig:
     escalation: dict
 
 
+_PROJECT_FIELDS = {
+    "repo_path",
+    "branch_prefix",
+    "max_concurrent_agents",
+    "db_path",
+    "max_budget_usd",
+}
+
+
 @dataclass
 class ProjectConfig:
     repo_path: str
@@ -24,6 +33,10 @@ class ProjectConfig:
     max_concurrent_agents: int = 3
     db_path: str = "scaffold.db"
     max_budget_usd: float | None = None
+
+    def __post_init__(self):
+        if self.max_budget_usd is not None and self.max_budget_usd <= 0:
+            raise ValueError(f"max_budget_usd must be positive, got {self.max_budget_usd}")
 
 
 @dataclass
@@ -62,6 +75,11 @@ def load_config(config_dir: str | Path, project: str | None = None) -> ScaffoldC
     else:
         with open(config_dir / "project.yaml") as f:
             proj_data = yaml.safe_load(f)
+    if not proj_data:
+        raise ValueError("Project config file is empty")
+    unknown_keys = set(proj_data.keys()) - _PROJECT_FIELDS
+    if unknown_keys:
+        raise ValueError(f"Unknown project config keys: {unknown_keys}")
     project_cfg = ProjectConfig(**proj_data)
 
     return ScaffoldConfig(governance=governance, agents=agents, project=project_cfg)

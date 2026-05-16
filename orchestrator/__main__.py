@@ -99,6 +99,7 @@ def run(spec, config, project):
                 click.echo("Run complete.")
             except BudgetExceededError as e:
                 click.echo(f"Run stopped: {e}")
+                raise SystemExit(2) from e
         finally:
             bot.close()
     conn.close()
