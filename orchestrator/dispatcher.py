@@ -5,6 +5,7 @@ import json
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 
+from orchestrator.budget import BudgetExceededError
 from orchestrator.event_bus import get_bus
 from orchestrator.state import TaskState, initial_state
 from orchestrator.task_tree import TaskTree
@@ -31,6 +32,7 @@ def run_task(
     tree: TaskTree,
     state: TaskState,
     thread_id: str,
+    max_budget_usd: float | None = None,
 ) -> dict:
     config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
     bus = get_bus()
@@ -44,6 +46,11 @@ def run_task(
 
     try:
         result = graph.invoke(state, config=config)
+    except BudgetExceededError:
+        tree.update_status(state["task_id"], "stuck")
+        if bus:
+            bus.emit("budget.exceeded", task_id=state["task_id"])
+        return {"status": "stuck", "child_tasks": []}
     except Exception as exc:
         tree.update_status(state["task_id"], "stuck")
         if bus:
@@ -74,6 +81,7 @@ def run_task(
         )
 
     child_statuses: list[str] = []
+    budget_blown = False
     for child in children:
         if not isinstance(child, dict):
             child_statuses.append("stuck")
@@ -109,11 +117,20 @@ def run_task(
             child_spec += "\n".join(f"- {ac}" for ac in criteria)
         child_state["agent_output"] = child_spec
 
-        run_task(graph, tree, child_state, child_id)
+        run_task(graph, tree, child_state, child_id, max_budget_usd=max_budget_usd)
         child_row = tree.get(child_id)
         child_statuses.append(child_row["status"] if child_row else "stuck")
 
-    final = "done" if all(s == "done" for s in child_statuses) else "blocked"
+        if max_budget_usd is not None and bus:
+            try:
+                bus.check_budget(max_budget_usd)
+            except BudgetExceededError:
+                bus.emit("budget.exceeded", task_id=state["task_id"])
+                budget_blown = True
+                break
+
+    all_done = not budget_blown and all(s == "done" for s in child_statuses)
+    final = "done" if all_done else "blocked"
     tree.update_status(state["task_id"], final)
     if bus:
         bus.emit(

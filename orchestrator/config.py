@@ -23,6 +23,7 @@ class ProjectConfig:
     branch_prefix: str = "scaffold"
     max_concurrent_agents: int = 3
     db_path: str = "scaffold.db"
+    max_budget_usd: float | None = None
 
 
 @dataclass

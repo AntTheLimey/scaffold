@@ -57,4 +57,3 @@ escalation:
   stuck_loop_model: claude-opus-4-6
   max_review_cycles: 3
   max_bug_cycles: 3
-  cost_threshold_per_run: 5.00

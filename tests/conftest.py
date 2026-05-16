@@ -78,7 +78,6 @@ def config_dir(tmp_path):
         "  stuck_loop_model: claude-opus-4-6\n"
         "  max_review_cycles: 3\n"
         "  max_bug_cycles: 3\n"
-        "  cost_threshold_per_run: 5.00\n"
     )
     project = tmp_path / "project.yaml"
     project.write_text(

@@ -8,6 +8,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 
 from orchestrator.agent_loader import AgentLoader
+from orchestrator.budget import BudgetExceededError
 from orchestrator.config import load_config
 from orchestrator.db import get_connection, init_db
 from orchestrator.dispatcher import run_task
@@ -45,6 +46,7 @@ def _build_scaffold(cfg, spec_path: str, checkpointer):
         agent_loader=agent_loader,
         agents_config=cfg.agents,
         checkpointer=checkpointer,
+        scaffold_budget_usd=cfg.project.max_budget_usd,
     )
     return graph, bot
 
@@ -86,8 +88,17 @@ def run(spec, config, project):
 
             click.echo(f"Scaffold started. Task: {task_id}, DB: {cfg.project.db_path}")
 
-            run_task(graph, tree, state, task_id)
-            click.echo("Run complete.")
+            try:
+                run_task(
+                    graph,
+                    tree,
+                    state,
+                    task_id,
+                    max_budget_usd=cfg.project.max_budget_usd,
+                )
+                click.echo("Run complete.")
+            except BudgetExceededError as e:
+                click.echo(f"Run stopped: {e}")
         finally:
             bot.close()
     conn.close()
@@ -242,6 +253,12 @@ def report(db, costs, cycles, agents, tools):
             click.echo(
                 f"{row['epic_title']}: {total_tokens} tokens, {row['total_runs']} runs, {wall}"
             )
+        total_cost = conn.execute(
+            "SELECT COALESCE("
+            "SUM(json_extract(event_data, '$.cost_usd')), 0.0"
+            ") as total FROM events WHERE event_type = 'cli.done'"
+        ).fetchone()["total"]
+        click.echo(f"Total spend: ${total_cost:.2f}")
     if cycles:
         rows = conn.execute("SELECT * FROM cycle_hotspots").fetchall()
         for row in rows:

@@ -87,6 +87,14 @@ class Telemetry:
         )
         self.conn.commit()
 
+    def cumulative_cost(self) -> float:
+        row = self.conn.execute(
+            "SELECT COALESCE("
+            "SUM(json_extract(event_data, '$.cost_usd')), 0.0"
+            ") as total FROM events WHERE event_type = 'cli.done'"
+        ).fetchone()
+        return float(row["total"])
+
     def get_failure_brief(self, task_id: str) -> str:
         events = self.conn.execute(
             "SELECT event_type, event_data FROM events "

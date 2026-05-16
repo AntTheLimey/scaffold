@@ -1,5 +1,6 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+from orchestrator.budget import BudgetExceededError
 from orchestrator.dispatcher import _normalize_acceptance, run_task
 from orchestrator.state import initial_state
 
@@ -245,6 +246,86 @@ def test_run_task_malformed_child_skipped(db):
     children = tree.list_children(parent_id)
     assert len(children) == 1
     assert children[0]["title"] == "Good"
+
+
+def test_run_task_catches_budget_exceeded_from_graph(db):
+    from orchestrator.task_tree import TaskTree
+
+    tree = TaskTree(db)
+    task_id = tree.create(title="Expensive task", level="task")
+
+    graph = MagicMock()
+    graph.invoke.side_effect = BudgetExceededError(spent=6.00, limit=5.00)
+
+    state = initial_state(task_id=task_id, level="task")
+    result = run_task(graph, tree, state, task_id, max_budget_usd=5.00)
+
+    assert result["status"] == "stuck"
+    row = tree.get(task_id)
+    assert row["status"] == "stuck"
+
+
+def test_run_task_checks_budget_between_children(db):
+    from orchestrator.task_tree import TaskTree
+
+    tree = TaskTree(db)
+    parent_id = tree.create(title="Epic", level="epic")
+
+    graph = MagicMock()
+    check_count = 0
+
+    def mock_invoke(state, config=None):
+        if state["level"] == "epic":
+            return {
+                "status": "decomposing",
+                "child_tasks": [
+                    {"title": "Child A", "level": "task"},
+                    {"title": "Child B", "level": "task"},
+                ],
+                "project_context": "",
+                "specialists": [],
+                "advisory": [],
+                "detected_languages": [],
+                "test_framework": "",
+            }
+        return {"status": "done", "child_tasks": []}
+
+    graph.invoke.side_effect = mock_invoke
+
+    mock_bus = MagicMock()
+
+    def check_budget_side_effect(limit):
+        nonlocal check_count
+        check_count += 1
+        if check_count >= 1:
+            raise BudgetExceededError(spent=6.00, limit=5.00)
+
+    mock_bus.check_budget.side_effect = check_budget_side_effect
+
+    state = initial_state(task_id=parent_id, level="epic")
+    with patch("orchestrator.dispatcher.get_bus", return_value=mock_bus):
+        run_task(graph, tree, state, parent_id, max_budget_usd=5.00)
+
+    parent = tree.get(parent_id)
+    assert parent["status"] == "blocked"
+    children = tree.list_children(parent_id)
+    done_children = [c for c in children if c["status"] == "done"]
+    assert len(done_children) == 1
+
+
+def test_run_task_no_budget_check_when_none(db):
+    from orchestrator.task_tree import TaskTree
+
+    tree = TaskTree(db)
+    task_id = tree.create(title="Leaf task", level="task")
+
+    graph = MagicMock()
+    graph.invoke.return_value = {"status": "done", "child_tasks": []}
+
+    state = initial_state(task_id=task_id, level="task")
+    result = run_task(graph, tree, state, task_id)
+
+    assert result["status"] == "done"
 
 
 def test_normalize_acceptance_variants():

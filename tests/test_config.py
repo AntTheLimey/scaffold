@@ -35,7 +35,6 @@ def test_agents_config_has_escalation(config_dir):
     assert escalation["stuck_loop_model"] == "claude-opus-4-6"
     assert escalation["max_review_cycles"] == 3
     assert escalation["max_bug_cycles"] == 3
-    assert escalation["cost_threshold_per_run"] == 5.00
 
 
 def test_workflow_agent_model_assignment(config_dir):
@@ -107,6 +106,28 @@ def test_load_config_with_project(tmp_path):
 def test_load_config_without_project_uses_root(config_dir):
     cfg = load_config(config_dir)
     assert cfg.project.repo_path == "/tmp/test-repo"
+
+
+def test_project_config_max_budget_usd(tmp_path):
+    governance = tmp_path / "governance.yaml"
+    governance.write_text("rapid: {}\nraci: {}\n")
+    agents = tmp_path / "agents.yaml"
+    agents.write_text("workflow: {}\nspecialists: {}\nescalation: {}\n")
+    project = tmp_path / "project.yaml"
+    project.write_text(
+        "repo_path: /tmp/test\n"
+        "branch_prefix: scaffold\n"
+        "max_concurrent_agents: 3\n"
+        "db_path: ':memory:'\n"
+        "max_budget_usd: 5.00\n"
+    )
+    cfg = load_config(str(tmp_path))
+    assert cfg.project.max_budget_usd == 5.00
+
+
+def test_project_config_max_budget_usd_defaults_none(config_dir):
+    cfg = load_config(config_dir)
+    assert cfg.project.max_budget_usd is None
 
 
 def test_load_config_project_not_found(tmp_path):

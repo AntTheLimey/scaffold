@@ -3,6 +3,9 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
+from orchestrator.budget import BudgetExceededError
 from orchestrator.event_bus import EventBus, get_bus, init_event_bus
 
 
@@ -174,3 +177,44 @@ def test_tool_call_event_without_run_id():
     assert events[0]["run_id"] is None
     data = json.loads(events[0]["event_data"])
     assert data["tool_name"] == "Bash"
+
+
+def test_cli_done_with_cost_usd():
+    conn = _make_db()
+    bus = EventBus(conn)
+    with patch("orchestrator.event_bus.click"):
+        bus.cli_done("python-expert", 1, True, "t-12", cost_usd=0.12)
+    events = _get_events(conn)
+    assert len(events) == 1
+    data = json.loads(events[0]["event_data"])
+    assert data["cost_usd"] == 0.12
+
+
+def test_cli_done_without_cost_usd():
+    conn = _make_db()
+    bus = EventBus(conn)
+    with patch("orchestrator.event_bus.click"):
+        bus.cli_done("python-expert", 1, True, "t-13")
+    events = _get_events(conn)
+    data = json.loads(events[0]["event_data"])
+    assert "cost_usd" not in data
+
+
+def test_check_budget_passes_when_under_limit():
+    conn = _make_db()
+    bus = EventBus(conn)
+    with patch("orchestrator.event_bus.click"):
+        bus.cli_done("developer", 1, True, "t-14", cost_usd=0.10)
+    bus.check_budget(5.00)
+
+
+def test_check_budget_raises_when_over_limit():
+    conn = _make_db()
+    bus = EventBus(conn)
+    with patch("orchestrator.event_bus.click"):
+        bus.cli_done("developer", 1, True, "t-15", cost_usd=3.00)
+        bus.cli_done("developer", 2, True, "t-15", cost_usd=3.00)
+    with pytest.raises(BudgetExceededError) as exc_info:
+        bus.check_budget(5.00)
+    assert exc_info.value.spent >= 5.00
+    assert exc_info.value.limit == 5.00

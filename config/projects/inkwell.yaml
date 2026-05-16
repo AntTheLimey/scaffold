@@ -1,0 +1,5 @@
+repo_path: /Users/antonypegg/PROJECTS/inkwell
+branch_prefix: scaffold
+max_concurrent_agents: 3
+db_path: scaffold_inkwell.db
+max_budget_usd: 5.00

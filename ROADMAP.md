@@ -34,8 +34,7 @@ Items are force-ranked by score. Higher score = do first.
 | Item | Impact | Urgency | Effort | Score | Status | Notes |
 |------|:------:|:-------:|:------:|:-----:|--------|-------|
 | AdvisorAgent tool use | 5 | 5 | L (3) | 5.0 | Planned | Workflow agents (architect, reviewer, qa) are blind — they can't read the codebase, query MCP servers, or use any tools. Add a tool execution loop to AdvisorAgent.call() with per-agent tool rosters. Single highest-impact improvement to scaffold output quality. |
-| Observability: tool call logging + wallclock time | 3 | 4 | M (2) | 5.0 | In Progress | DoerAgent tool call logging via --output-format stream-json --verbose, wallclock time in report CLI, new tool_usage SQL view. See spec when written. |
-| Cost estimation and budgets | 3 | 3 | M (2) | 4.5 | Idea | Estimate cost before running (model prices x estimated tokens), warn when approaching a budget cap, surface cumulative spend in report. Operators need to know what a run will cost before it starts. |
+| Cost estimation (pre-run) | 2 | 2 | M (2) | 3.0 | Idea | Estimate cost before running (model prices x estimated tokens). Budget controls are done; this adds pre-run estimation only. |
 | Structured output for AdvisorAgents | 4 | 3 | M (2) | 5.5 | Idea | Replace JSON-in-text extraction (regex on response.content[0].text) with Anthropic's structured output or tool_use for schema-enforced responses. Eliminates parse failures and retries. |
 | Agent memory / cross-run context | 4 | 2 | L (3) | 3.3 | Idea | Persist lessons learned across runs — what patterns worked, what the codebase looks like, what failed last time. Currently every run starts cold. |
 | Parallel specialist dispatch | 3 | 2 | L (3) | 2.7 | Idea | Developer node dispatches one specialist at a time. When a task touches multiple domains (Go + React), run specialists in parallel worktrees. |
@@ -47,7 +46,10 @@ Items are force-ranked by score. Higher score = do first.
 
 ## Completed
 
-(None yet — project is in initial development)
+| Item | PR | Notes |
+|------|----|-------|
+| Observability: tool call logging + wallclock time | #3 | DoerAgent stream-json parsing, tool.call events, wallclock in report, tool_usage view |
+| Budget controls | #4 | Per-specialist --max-budget-usd, scaffold-level cumulative cost check, BudgetExceededError abort |
 
 ## Notes
 
@@ -57,6 +59,6 @@ Items are force-ranked by score. Higher score = do first.
   evaluates without checking what was written. Do this immediately after
   the observability PR lands.
 
-- **Observability first** because it gives us data to evaluate whether
-  subsequent changes (tool use, structured output) actually improve
-  outcomes. Measure before you optimize.
+- **Observability and budget controls are done.** We can now see what
+  agents do (tool calls, wallclock time) and cap how much they spend
+  (per-specialist and scaffold-wide). Ready for a real test run.

@@ -473,6 +473,26 @@ def test_report_tools_empty(runner, tmp_path):
     assert "No tool" in result.output
 
 
+def test_report_costs_shows_cumulative_spend(runner, tmp_path):
+    db_path = _make_report_db(tmp_path)
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        "INSERT INTO events (id, task_id, agent_role, event_type, event_data) "
+        "VALUES ('e1', 'task-1', 'developer', 'cli.done', "
+        '\'{"iteration": 1, "success": true, "cost_usd": 0.12}\')'
+    )
+    conn.execute(
+        "INSERT INTO events (id, task_id, agent_role, event_type, event_data) "
+        "VALUES ('e2', 'task-1', 'developer', 'cli.done', "
+        '\'{"iteration": 2, "success": true, "cost_usd": 0.08}\')'
+    )
+    conn.commit()
+    conn.close()
+    result = runner.invoke(cli, ["report", "--costs", "--db", str(db_path)])
+    assert result.exit_code == 0
+    assert "$0.20" in result.output
+
+
 def test_cli_run_project_not_found(runner, tmp_path):
     spec = tmp_path / "spec.md"
     spec.write_text("# Test Spec")
