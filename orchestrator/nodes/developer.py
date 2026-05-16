@@ -20,6 +20,7 @@ def make_developer_node(
     agent_loader: AgentLoader,
     agents_config: AgentsConfig,
     client=None,
+    scaffold_budget_usd: float | None = None,
 ):
     def developer_node(state: TaskState) -> dict:
         bus = get_bus()
@@ -95,6 +96,7 @@ def make_developer_node(
             model=spec_config["model"],
             max_iterations=spec_config.get("max_iterations", 10),
             completion_promise=spec_config.get("completion_promise", "TASK COMPLETE"),
+            max_budget_usd=spec_config.get("max_budget_usd"),
         )
 
         # 9. Create worktree, run ralph_loop, cleanup in finally block
@@ -113,6 +115,7 @@ def make_developer_node(
                 prompt=prompt,
                 failure_context=failure_context,
                 task_id=state["task_id"],
+                scaffold_budget_usd=scaffold_budget_usd,
             )
         finally:
             doer.cleanup_worktree(repo_path, worktree_path)

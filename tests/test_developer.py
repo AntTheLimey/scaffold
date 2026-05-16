@@ -89,6 +89,7 @@ def test_developer_dispatches_correct_specialist(
         model="claude-sonnet-4-6",
         max_iterations=8,
         completion_promise="TASK COMPLETE",
+        max_budget_usd=None,
     )
 
 
@@ -115,6 +116,7 @@ def test_developer_matches_specialist_by_file_type(
         model="claude-sonnet-4-6",
         max_iterations=8,
         completion_promise="TASK COMPLETE",
+        max_budget_usd=None,
     )
 
 
@@ -148,6 +150,7 @@ def test_developer_detects_specialist_from_agent_output(
         model="claude-sonnet-4-6",
         max_iterations=10,
         completion_promise="TASK COMPLETE",
+        max_budget_usd=None,
     )
 
 
@@ -293,7 +296,70 @@ def test_developer_fallback_to_python_expert(mock_doer, mock_advisor, agent_load
         model="claude-sonnet-4-6",
         max_iterations=10,
         completion_promise="TASK COMPLETE",
+        max_budget_usd=None,
     )
+
+
+def test_developer_passes_max_budget_to_doer(mock_doer, mock_advisor, agent_loader, agents_config):
+    agents_config.specialists["python-expert"]["max_budget_usd"] = 2.00
+    node_fn = make_developer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        agent_loader=agent_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-010", level="task")
+    state["specialists"] = ["python-expert"]
+    state["agent_output"] = "Update main.py"
+
+    node_fn(state)
+
+    mock_doer.assert_called_once_with(
+        role="python-expert",
+        model="claude-sonnet-4-6",
+        max_iterations=10,
+        completion_promise="TASK COMPLETE",
+        max_budget_usd=2.00,
+    )
+
+
+def test_developer_passes_scaffold_budget_to_ralph_loop(
+    mock_doer, mock_advisor, agent_loader, agents_config
+):
+    node_fn = make_developer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        agent_loader=agent_loader,
+        agents_config=agents_config,
+        scaffold_budget_usd=10.00,
+    )
+    state = initial_state(task_id="task-011", level="task")
+    state["specialists"] = ["python-expert"]
+    state["agent_output"] = "Update main.py"
+
+    node_fn(state)
+
+    ralph_call = mock_doer.return_value.ralph_loop.call_args
+    assert ralph_call.kwargs.get("scaffold_budget_usd") == 10.00
+
+
+def test_developer_no_scaffold_budget_by_default(
+    mock_doer, mock_advisor, agent_loader, agents_config
+):
+    node_fn = make_developer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        agent_loader=agent_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-012", level="task")
+    state["specialists"] = ["python-expert"]
+    state["agent_output"] = "Update main.py"
+
+    node_fn(state)
+
+    ralph_call = mock_doer.return_value.ralph_loop.call_args
+    assert ralph_call.kwargs.get("scaffold_budget_usd") is None
 
 
 def test_extract_file_paths():
