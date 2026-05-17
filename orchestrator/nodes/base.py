@@ -5,6 +5,7 @@ from pathlib import Path
 
 import click
 
+from orchestrator.budget import cost_for_tokens
 from orchestrator.event_bus import get_bus
 
 
@@ -57,6 +58,7 @@ class AgentResult:
     text: str
     token_in: int
     token_out: int
+    cost_usd: float = 0.0
 
 
 class AdvisorAgent:
@@ -88,10 +90,13 @@ class AdvisorAgent:
             system=system,
             messages=[{"role": "user", "content": user_message}],
         )
+        token_in = response.usage.input_tokens
+        token_out = response.usage.output_tokens
         return AgentResult(
             text=response.content[0].text,
-            token_in=response.usage.input_tokens,
-            token_out=response.usage.output_tokens,
+            token_in=token_in,
+            token_out=token_out,
+            cost_usd=cost_for_tokens(self.model, token_in, token_out),
         )
 
 

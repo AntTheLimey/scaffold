@@ -149,3 +149,54 @@ def test_finish_run(telemetry, db):
     run = db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,)).fetchone()
     assert run["outcome"] == "success"
     assert run["iterations"] == 3
+
+
+def test_cumulative_cost_includes_api_response_costs(telemetry, db):
+    db.execute(
+        "INSERT INTO tasks (id, level, status, title) VALUES (?, ?, ?, ?)",
+        ("t-api", "task", "in_progress", "Test"),
+    )
+    db.commit()
+    telemetry.log(
+        task_id="t-api",
+        agent_role="architect",
+        event_type="api.response",
+        event_data={"token_in": 1000, "token_out": 500, "cost_usd": 0.05},
+    )
+    assert telemetry.cumulative_cost() == pytest.approx(0.05)
+
+
+def test_cumulative_cost_sums_cli_and_api(telemetry, db):
+    db.execute(
+        "INSERT INTO tasks (id, level, status, title) VALUES (?, ?, ?, ?)",
+        ("t-both", "task", "in_progress", "Test"),
+    )
+    db.commit()
+    telemetry.log(
+        task_id="t-both",
+        agent_role="developer",
+        event_type="cli.done",
+        event_data={"iteration": 1, "success": True, "cost_usd": 0.10},
+    )
+    telemetry.log(
+        task_id="t-both",
+        agent_role="architect",
+        event_type="api.response",
+        event_data={"token_in": 1000, "token_out": 500, "cost_usd": 0.05},
+    )
+    assert telemetry.cumulative_cost() == pytest.approx(0.15)
+
+
+def test_cumulative_cost_api_zero_cost_not_double_counted(telemetry, db):
+    db.execute(
+        "INSERT INTO tasks (id, level, status, title) VALUES (?, ?, ?, ?)",
+        ("t-zero", "task", "in_progress", "Test"),
+    )
+    db.commit()
+    telemetry.log(
+        task_id="t-zero",
+        agent_role="architect",
+        event_type="api.response",
+        event_data={"token_in": 0, "token_out": 0, "cost_usd": 0.0},
+    )
+    assert telemetry.cumulative_cost() == pytest.approx(0.0)

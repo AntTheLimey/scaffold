@@ -89,9 +89,10 @@ class Telemetry:
 
     def cumulative_cost(self) -> float:
         row = self.conn.execute(
-            "SELECT COALESCE("
-            "SUM(json_extract(event_data, '$.cost_usd')), 0.0"
-            ") as total FROM events WHERE event_type = 'cli.done'"
+            "SELECT COALESCE(SUM(cost), 0.0) as total FROM ("
+            "  SELECT json_extract(event_data, '$.cost_usd') as cost"
+            "  FROM events WHERE event_type IN ('cli.done', 'api.response')"
+            ")"
         ).fetchone()
         return float(row["total"])
 
