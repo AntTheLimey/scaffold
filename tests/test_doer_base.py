@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from orchestrator.budget import BudgetExceededError
 from orchestrator.nodes.base import DoerAgent, parse_cli_output
 
 
@@ -220,3 +221,97 @@ def test_doer_falls_back_on_plain_text_output(mock_run, doer):
     result = doer.ralph_loop(worktree_path="/tmp/wt", prompt="Do it")
     assert result.success is True
     assert result.output == "Plain text output.\nTASK COMPLETE"
+
+
+def test_doer_passes_max_budget_to_cli():
+    doer = DoerAgent(
+        role="developer",
+        model="claude-sonnet-4-6",
+        max_iterations=3,
+        completion_promise="TASK COMPLETE",
+        max_budget_usd=2.00,
+    )
+    with patch("orchestrator.nodes.base.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(stdout="Done.\nTASK COMPLETE", stderr="", returncode=0)
+        doer.ralph_loop(worktree_path="/tmp/wt", prompt="Do it")
+    cmd = mock_run.call_args.args[0]
+    assert "--max-budget-usd" in cmd
+    idx = cmd.index("--max-budget-usd")
+    assert cmd[idx + 1] == "2.0"
+
+
+def test_doer_omits_max_budget_when_none():
+    doer = DoerAgent(
+        role="developer",
+        model="claude-sonnet-4-6",
+        max_iterations=3,
+        completion_promise="TASK COMPLETE",
+    )
+    with patch("orchestrator.nodes.base.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(stdout="Done.\nTASK COMPLETE", stderr="", returncode=0)
+        doer.ralph_loop(worktree_path="/tmp/wt", prompt="Do it")
+    cmd = mock_run.call_args.args[0]
+    assert "--max-budget-usd" not in cmd
+
+
+@patch("orchestrator.nodes.base.subprocess.run")
+def test_doer_passes_cost_usd_to_cli_done(mock_run):
+    doer = DoerAgent(
+        role="developer",
+        model="claude-sonnet-4-6",
+        max_iterations=3,
+        completion_promise="TASK COMPLETE",
+    )
+    mock_bus = MagicMock()
+    with patch("orchestrator.nodes.base.get_bus", return_value=mock_bus):
+        mock_run.return_value = MagicMock(stdout=STREAM_JSON_SUCCESS, stderr="", returncode=0)
+        doer.ralph_loop(worktree_path="/tmp/wt", prompt="Do it", task_id="t-1")
+    cli_done_calls = [c for c in mock_bus.method_calls if c[0] == "cli_done"]
+    assert len(cli_done_calls) == 1
+    assert cli_done_calls[0].kwargs.get("cost_usd") == pytest.approx(0.05)
+
+
+@patch("orchestrator.nodes.base.subprocess.run")
+def test_doer_checks_scaffold_budget_between_iterations(mock_run):
+    doer = DoerAgent(
+        role="developer",
+        model="claude-sonnet-4-6",
+        max_iterations=5,
+        completion_promise="TASK COMPLETE",
+    )
+    mock_bus = MagicMock()
+    call_count = 0
+
+    def budget_side_effect(limit):
+        nonlocal call_count
+        call_count += 1
+        if call_count >= 2:
+            raise BudgetExceededError(spent=5.50, limit=5.00)
+
+    mock_bus.check_budget.side_effect = budget_side_effect
+
+    with patch("orchestrator.nodes.base.get_bus", return_value=mock_bus):
+        mock_run.return_value = MagicMock(stdout="Still working...", stderr="", returncode=0)
+        with pytest.raises(BudgetExceededError):
+            doer.ralph_loop(
+                worktree_path="/tmp/wt",
+                prompt="Do it",
+                task_id="t-1",
+                scaffold_budget_usd=5.00,
+            )
+    assert mock_run.call_count == 2
+
+
+@patch("orchestrator.nodes.base.subprocess.run")
+def test_doer_no_budget_check_when_scaffold_budget_none(mock_run):
+    doer = DoerAgent(
+        role="developer",
+        model="claude-sonnet-4-6",
+        max_iterations=3,
+        completion_promise="TASK COMPLETE",
+    )
+    mock_bus = MagicMock()
+    with patch("orchestrator.nodes.base.get_bus", return_value=mock_bus):
+        mock_run.return_value = MagicMock(stdout="Done.\nTASK COMPLETE", stderr="", returncode=0)
+        doer.ralph_loop(worktree_path="/tmp/wt", prompt="Do it", task_id="t-1")
+    mock_bus.check_budget.assert_not_called()

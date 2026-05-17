@@ -109,11 +109,15 @@ class DoerAgent:
         model: str,
         max_iterations: int = 10,
         completion_promise: str = "TASK COMPLETE",
+        max_budget_usd: float | None = None,
+        timeout: int = 600,
     ):
         self.role = role
         self.model = model
         self.max_iterations = max_iterations
         self.completion_promise = completion_promise
+        self.max_budget_usd = max_budget_usd
+        self.timeout = timeout
 
     def create_worktree(self, repo_path: Path | str, branch: str) -> Path:
         repo_path = Path(repo_path)
@@ -161,6 +165,7 @@ class DoerAgent:
         prompt: str,
         failure_context: str = "",
         task_id: str = "",
+        scaffold_budget_usd: float | None = None,
     ) -> RalphResult:
         bus = get_bus()
         last_output = ""
@@ -180,22 +185,26 @@ class DoerAgent:
                 current_prompt = prompt
 
             success = False
+            iteration_cost: float | None = None
             try:
-                result = subprocess.run(
+                cmd = ["claude", "--model", self.model]
+                if self.max_budget_usd is not None:
+                    cmd.extend(["--max-budget-usd", str(self.max_budget_usd)])
+                cmd.extend(
                     [
-                        "claude",
-                        "--model",
-                        self.model,
                         "--output-format",
                         "stream-json",
                         "--verbose",
                         "-p",
                         current_prompt,
-                    ],
+                    ]
+                )
+                result = subprocess.run(
+                    cmd,
                     capture_output=True,
                     text=True,
                     cwd=str(worktree_path),
-                    timeout=600,
+                    timeout=self.timeout,
                 )
                 parsed = parse_cli_output(result.stdout)
                 if result.stdout and not parsed.tool_names and parsed.cost_usd is None:
@@ -204,13 +213,22 @@ class DoerAgent:
                         err=True,
                     )
                 last_output = parsed.result_text
+                iteration_cost = parsed.cost_usd
                 success = self.completion_promise in parsed.result_text
                 if bus:
                     for tool_name in parsed.tool_names:
                         bus.tool_call(self.role, tool_name, task_id)
             finally:
                 if bus:
-                    bus.cli_done(self.role, i, success, task_id)
+                    bus.cli_done(
+                        self.role,
+                        i,
+                        success,
+                        task_id,
+                        cost_usd=iteration_cost,
+                    )
+            if bus and scaffold_budget_usd is not None:
+                bus.check_budget(scaffold_budget_usd)
             if success:
                 return RalphResult(success=True, iterations=i, output=parsed.result_text)
 

@@ -281,6 +281,84 @@ def test_detect_project_project_context_empty_when_no_claude_md(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# detect_project — CLAUDE.md text fallback (greenfield repos)
+# ---------------------------------------------------------------------------
+
+
+def test_detect_project_fallback_languages_from_claude_md(tmp_path):
+    claude_md = "# Inkwell VTT\n\nGo, React, TypeScript, PostgreSQL\n" + "\n".join(
+        [f"line {i}" for i in range(60)]
+    )
+    (tmp_path / "CLAUDE.md").write_text(claude_md)
+    result = detect_project(tmp_path)
+    assert "go" in result["detected_languages"]
+    assert "typescript" in result["detected_languages"]
+
+
+def test_detect_project_fallback_python_from_claude_md(tmp_path):
+    claude_md = "# My App\n\nPython backend with FastAPI\n" + "\n".join(
+        [f"line {i}" for i in range(60)]
+    )
+    (tmp_path / "CLAUDE.md").write_text(claude_md)
+    result = detect_project(tmp_path)
+    assert "python" in result["detected_languages"]
+    assert "fastapi" in result["detected_frameworks"]
+
+
+def test_detect_project_fallback_skipped_when_manifests_exist(tmp_path):
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'foo'")
+    claude_md = "# App\n\nGo, React, TypeScript\n" + "\n".join([f"line {i}" for i in range(60)])
+    (tmp_path / "CLAUDE.md").write_text(claude_md)
+    result = detect_project(tmp_path)
+    assert result["detected_languages"] == ["python"]
+    assert "go" not in result["detected_languages"]
+
+
+def test_detect_project_fallback_frameworks_from_claude_md(tmp_path):
+    claude_md = "# App\n\nReact 18 + TypeScript\n" + "\n".join([f"line {i}" for i in range(60)])
+    (tmp_path / "CLAUDE.md").write_text(claude_md)
+    result = detect_project(tmp_path)
+    assert "react" in result["detected_frameworks"]
+
+
+def test_detect_project_fallback_database_from_claude_md(tmp_path):
+    claude_md = "# App\n\nPostgreSQL database\n" + "\n".join([f"line {i}" for i in range(60)])
+    (tmp_path / "CLAUDE.md").write_text(claude_md)
+    result = detect_project(tmp_path)
+    assert result["has_database"] is True
+
+
+def test_detect_project_no_fallback_when_no_claude_md(tmp_path):
+    result = detect_project(tmp_path)
+    assert result["detected_languages"] == []
+    assert result["detected_frameworks"] == []
+    assert result["has_database"] is False
+
+
+# ---------------------------------------------------------------------------
+# make_onboarding_node — specialist routing from CLAUDE.md fallback
+# ---------------------------------------------------------------------------
+
+
+def test_onboarding_node_routes_from_claude_md_when_no_manifests(tmp_path):
+    agents_dir = tmp_path / "agents"
+    make_specialist(agents_dir, "go-expert")
+    make_specialist(agents_dir, "react-expert")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    claude_md = "# Inkwell\n\nGo, React, TypeScript, PostgreSQL\n" + "\n".join(
+        [f"line {i}" for i in range(60)]
+    )
+    (repo / "CLAUDE.md").write_text(claude_md)
+
+    node = make_onboarding_node(str(repo), agents_dir)
+    result = node({})
+
+    assert "go-expert" in result["specialists"]
+    assert "react-expert" in result["specialists"]
+
+
+# ---------------------------------------------------------------------------
 # make_onboarding_node — specialist routing
 # ---------------------------------------------------------------------------
 

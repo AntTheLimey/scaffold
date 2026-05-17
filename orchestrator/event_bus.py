@@ -79,14 +79,31 @@ class EventBus:
             iteration=iteration,
         )
 
-    def cli_done(self, agent_role: str, iteration: int, success: bool, task_id: str) -> None:
-        self.emit(
-            "cli.done",
-            agent_role=agent_role,
-            task_id=task_id,
-            iteration=iteration,
-            success=success,
-        )
+    def cli_done(
+        self,
+        agent_role: str,
+        iteration: int,
+        success: bool,
+        task_id: str,
+        cost_usd: float | None = None,
+    ) -> None:
+        if cost_usd is not None:
+            self.emit(
+                "cli.done",
+                agent_role=agent_role,
+                task_id=task_id,
+                iteration=iteration,
+                success=success,
+                cost_usd=cost_usd,
+            )
+        else:
+            self.emit(
+                "cli.done",
+                agent_role=agent_role,
+                task_id=task_id,
+                iteration=iteration,
+                success=success,
+            )
 
     def route(self, from_node: str, to_node: str, reason: str, task_id: str) -> None:
         self.emit(
@@ -102,6 +119,13 @@ class EventBus:
 
     def escalation(self, reason: str, task_id: str) -> None:
         self.emit("agent.escalate", task_id=task_id, reason=reason)
+
+    def check_budget(self, limit: float) -> None:
+        from orchestrator.budget import BudgetExceededError
+
+        spent = self.telemetry.cumulative_cost()
+        if spent >= limit:
+            raise BudgetExceededError(spent, limit)
 
     def tool_call(
         self,

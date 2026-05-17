@@ -92,6 +92,52 @@ def test_start_run(telemetry, db):
     assert run["outcome"] is None
 
 
+def test_cumulative_cost_with_no_events(telemetry):
+    assert telemetry.cumulative_cost() == 0.0
+
+
+def test_cumulative_cost_sums_cli_done_events(telemetry, db):
+    db.execute(
+        "INSERT INTO tasks (id, level, status, title) VALUES (?, ?, ?, ?)",
+        ("task-001", "task", "in_progress", "Test"),
+    )
+    db.commit()
+    telemetry.log(
+        task_id="task-001",
+        agent_role="developer",
+        event_type="cli.done",
+        event_data={"iteration": 1, "success": True, "cost_usd": 0.12},
+    )
+    telemetry.log(
+        task_id="task-001",
+        agent_role="developer",
+        event_type="cli.done",
+        event_data={"iteration": 2, "success": True, "cost_usd": 0.08},
+    )
+    assert telemetry.cumulative_cost() == pytest.approx(0.20)
+
+
+def test_cumulative_cost_ignores_null_cost(telemetry, db):
+    db.execute(
+        "INSERT INTO tasks (id, level, status, title) VALUES (?, ?, ?, ?)",
+        ("task-001", "task", "in_progress", "Test"),
+    )
+    db.commit()
+    telemetry.log(
+        task_id="task-001",
+        agent_role="developer",
+        event_type="cli.done",
+        event_data={"iteration": 1, "success": True, "cost_usd": 0.10},
+    )
+    telemetry.log(
+        task_id="task-001",
+        agent_role="developer",
+        event_type="cli.done",
+        event_data={"iteration": 2, "success": False},
+    )
+    assert telemetry.cumulative_cost() == pytest.approx(0.10)
+
+
 def test_finish_run(telemetry, db):
     db.execute(
         "INSERT INTO tasks (id, level, status, title) VALUES (?, ?, ?, ?)",

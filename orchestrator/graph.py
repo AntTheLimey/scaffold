@@ -107,6 +107,7 @@ def build_graph(
     agent_loader: AgentLoader,
     agents_config: AgentsConfig,
     checkpointer=None,
+    scaffold_budget_usd: float | None = None,
 ):
     graph = StateGraph(TaskState)
 
@@ -132,7 +133,14 @@ def build_graph(
     )
     graph.add_node(
         "developer",
-        make_developer_node(repo_path, branch_prefix, agent_loader, agents_config, client),
+        make_developer_node(
+            repo_path,
+            branch_prefix,
+            agent_loader,
+            agents_config,
+            client,
+            scaffold_budget_usd=scaffold_budget_usd,
+        ),
     )
     reviewer_model = _model("reviewer", "claude-sonnet-4-6")
     graph.add_node(

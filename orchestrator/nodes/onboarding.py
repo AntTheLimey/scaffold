@@ -16,6 +16,18 @@ LANGUAGE_TO_SPECIALIST: dict[str, str] = {
 # Keywords in file/directory paths that trigger security-auditor
 _SECURITY_TRIGGERS = {"auth", "security", "jwt", "oauth"}
 
+# CLAUDE.md text fallback — used when no manifest files exist (greenfield repos)
+_CLAUDEMD_LANGUAGE_KEYWORDS: dict[str, str] = {
+    "python": "python",
+    "golang": "go",
+    "typescript": "typescript",
+    "javascript": "javascript",
+}
+_CLAUDEMD_LANGUAGE_CASE_SENSITIVE: dict[str, str] = {
+    "Go": "go",
+}
+_DB_TEXT_KEYWORDS = {"postgresql", "postgres", "mysql", "sqlite", "mongodb"}
+
 # Package-level deps in pyproject.toml that signal a database
 _DB_PYPROJECT_KEYWORDS = {"psycopg", "psycopg2", "postgres", "sqlalchemy"}
 
@@ -128,6 +140,20 @@ def detect_project(repo_path: Path) -> dict:
     if not test_framework and "go" in detected_languages and list(repo_path.rglob("*_test.go")):
         test_framework = "go test"
 
+    # ---- CLAUDE.md text fallback (greenfield repos with no manifest files) ----
+    if not detected_languages and project_context:
+        text_lower = project_context.lower()
+        for keyword, lang in _CLAUDEMD_LANGUAGE_KEYWORDS.items():
+            if keyword in text_lower and lang not in detected_languages:
+                detected_languages.append(lang)
+        for keyword, lang in _CLAUDEMD_LANGUAGE_CASE_SENSITIVE.items():
+            if keyword in project_context and lang not in detected_languages:
+                detected_languages.append(lang)
+        if not detected_frameworks:
+            for fw in _JS_FRAMEWORKS | _PY_FRAMEWORKS:
+                if fw in text_lower and fw not in detected_frameworks:
+                    detected_frameworks.append(fw)
+
     # ---- Database detection ----
     # pyproject.toml deps
     if pyproject_text:
@@ -162,6 +188,12 @@ def detect_project(repo_path: Path) -> dict:
     # .sql files anywhere in repo
     if not has_database and list(repo_path.rglob("*.sql")):
         has_database = True
+
+    # CLAUDE.md text fallback for database
+    if not has_database and project_context:
+        text_lower = project_context.lower()
+        if any(kw in text_lower for kw in _DB_TEXT_KEYWORDS):
+            has_database = True
 
     return {
         "repo_path": repo_path,

@@ -26,21 +26,25 @@ specialists:
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
+    timeout: 900
   go-expert:
     model: claude-sonnet-4-6
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
+    timeout: 900
   react-expert:
     model: claude-sonnet-4-6
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
+    timeout: 900
   typescript-expert:
     model: claude-sonnet-4-6
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
+    timeout: 900
   postgres-expert:
     model: claude-opus-4-6
     execution: api
@@ -57,4 +61,3 @@ escalation:
   stuck_loop_model: claude-opus-4-6
   max_review_cycles: 3
   max_bug_cycles: 3
-  cost_threshold_per_run: 5.00
