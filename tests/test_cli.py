@@ -489,6 +489,26 @@ def test_report_costs_shows_cumulative_spend(runner, tmp_path):
     assert "$0.20" in result.output
 
 
+def test_report_costs_includes_api_spend(runner, tmp_path):
+    db_path = _make_report_db(tmp_path)
+    conn = get_connection(str(db_path))
+    conn.execute(
+        "INSERT INTO events (id, task_id, agent_role, event_type, event_data) "
+        "VALUES ('e1', 'task-1', 'developer', 'cli.done', "
+        '\'{"iteration": 1, "success": true, "cost_usd": 0.10}\')'
+    )
+    conn.execute(
+        "INSERT INTO events (id, task_id, agent_role, event_type, event_data) "
+        "VALUES ('e2', 'task-1', 'architect', 'api.response', "
+        '\'{"model": "claude-opus-4-6", "token_in": 500, "token_out": 200, "cost_usd": 0.05}\')'
+    )
+    conn.commit()
+    conn.close()
+    result = runner.invoke(cli, ["report", "--costs", "--db", str(db_path)])
+    assert result.exit_code == 0
+    assert "$0.15" in result.output
+
+
 def test_cli_run_project_not_found(runner, tmp_path):
     spec = tmp_path / "spec.md"
     spec.write_text("# Test Spec")

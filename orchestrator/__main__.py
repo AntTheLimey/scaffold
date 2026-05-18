@@ -20,6 +20,7 @@ from orchestrator.preflight import run_preflight
 from orchestrator.state import initial_state
 from orchestrator.task_tree import TaskTree
 from orchestrator.telegram import TelegramBot
+from orchestrator.telemetry import Telemetry
 
 
 def _checkpoint_path(db_path: str) -> str:
@@ -254,11 +255,7 @@ def report(db, costs, cycles, agents, tools):
             click.echo(
                 f"{row['epic_title']}: {total_tokens} tokens, {row['total_runs']} runs, {wall}"
             )
-        total_cost = conn.execute(
-            "SELECT COALESCE("
-            "SUM(json_extract(event_data, '$.cost_usd')), 0.0"
-            ") as total FROM events WHERE event_type = 'cli.done'"
-        ).fetchone()["total"]
+        total_cost = Telemetry(conn).cumulative_cost()
         click.echo(f"Total spend: ${total_cost:.2f}")
     if cycles:
         rows = conn.execute("SELECT * FROM cycle_hotspots").fetchall()

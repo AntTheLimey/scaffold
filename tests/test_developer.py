@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from orchestrator.budget import BudgetExceededError
 from orchestrator.nodes.base import AgentResult, RalphResult
 from orchestrator.nodes.developer import _extract_file_paths, make_developer_node
 from orchestrator.state import initial_state
@@ -425,6 +426,37 @@ def test_developer_passes_timeout_from_config(mock_doer, mock_advisor, agent_loa
         max_budget_usd=None,
         timeout=900,
     )
+
+
+def test_developer_checks_budget_after_advisory_api_call(
+    mock_doer, mock_advisor, agent_loader, agents_config
+):
+    mock_bus = MagicMock()
+    mock_bus.check_budget.side_effect = BudgetExceededError(spent=6.0, limit=5.0)
+    mock_client = MagicMock()
+    agents_config.specialists["postgres-expert"] = {
+        "model": "claude-opus-4-6",
+        "execution": "api",
+    }
+    mock_advisor.return_value.call.return_value = AgentResult(
+        text="Use indexes", token_in=200, token_out=100
+    )
+    with patch("orchestrator.nodes.developer.get_bus", return_value=mock_bus):
+        node_fn = make_developer_node(
+            repo_path="/tmp/repo",
+            branch_prefix="scaffold",
+            agent_loader=agent_loader,
+            agents_config=agents_config,
+            client=mock_client,
+            scaffold_budget_usd=5.0,
+        )
+        state = initial_state(task_id="task-015", level="task")
+        state["specialists"] = ["python-expert"]
+        state["advisory"] = ["postgres-expert"]
+        state["agent_output"] = "Update db.py"
+        with pytest.raises(BudgetExceededError):
+            node_fn(state)
+    mock_bus.check_budget.assert_called_with(5.0)
 
 
 def test_extract_file_paths():

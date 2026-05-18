@@ -15,6 +15,11 @@ MODEL_PRICING: dict[str, tuple[float, float]] = {
 def cost_for_tokens(model: str, token_in: int, token_out: int) -> float:
     pricing = MODEL_PRICING.get(model)
     if pricing is None:
+        for key in sorted(MODEL_PRICING, key=len, reverse=True):
+            if model.startswith(key):
+                pricing = MODEL_PRICING[key]
+                break
+    if pricing is None:
         return 0.0
     input_price, output_price = pricing
     return (token_in * input_price + token_out * output_price) / 1_000_000

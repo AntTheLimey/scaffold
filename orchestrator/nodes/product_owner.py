@@ -18,7 +18,11 @@ SYSTEM_PROMPT = (
 
 
 def make_product_owner_node(
-    client, spec_path: str, agent_loader: AgentLoader, model: str = "claude-opus-4-6"
+    client,
+    spec_path: str,
+    agent_loader: AgentLoader,
+    model: str = "claude-opus-4-6",
+    scaffold_budget_usd: float | None = None,
 ):
     agent = AdvisorAgent(
         role="product_owner",
@@ -62,6 +66,8 @@ def make_product_owner_node(
             bus.api_call_done(
                 "product_owner", model, result.token_in, result.token_out, state["task_id"]
             )
+            if scaffold_budget_usd is not None:
+                bus.check_budget(scaffold_budget_usd)
 
         parsed = extract_json(result.text)
         children = parsed.get("children", [])

@@ -61,3 +61,11 @@ class TestCostForTokens:
         cost_46 = cost_for_tokens("claude-opus-4-6", token_in=1_000_000, token_out=1_000_000)
         cost_47 = cost_for_tokens("claude-opus-4-7", token_in=1_000_000, token_out=1_000_000)
         assert cost_46 == pytest.approx(cost_47)
+
+    def test_dated_model_id_matches_by_prefix(self):
+        cost = cost_for_tokens("claude-sonnet-4-6-20260501", token_in=1_000_000, token_out=0)
+        assert cost == pytest.approx(3.0)
+
+    def test_dated_opus_matches_by_prefix(self):
+        cost = cost_for_tokens("claude-opus-4-6-20260101", token_in=0, token_out=1_000_000)
+        assert cost == pytest.approx(75.0)

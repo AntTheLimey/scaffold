@@ -121,15 +121,27 @@ def build_graph(
     po_model = _model("product_owner", "claude-opus-4-6")
     graph.add_node(
         "product_owner",
-        make_product_owner_node(client, spec_path, agent_loader, po_model),
+        make_product_owner_node(
+            client, spec_path, agent_loader, po_model, scaffold_budget_usd=scaffold_budget_usd
+        ),
     )
     graph.add_node(
         "architect",
-        make_architect_node(client, agent_loader, _model("architect", "claude-opus-4-6")),
+        make_architect_node(
+            client,
+            agent_loader,
+            _model("architect", "claude-opus-4-6"),
+            scaffold_budget_usd=scaffold_budget_usd,
+        ),
     )
     graph.add_node(
         "designer",
-        make_designer_node(client, agent_loader, _model("designer", "claude-sonnet-4-6")),
+        make_designer_node(
+            client,
+            agent_loader,
+            _model("designer", "claude-sonnet-4-6"),
+            scaffold_budget_usd=scaffold_budget_usd,
+        ),
     )
     graph.add_node(
         "developer",
@@ -155,7 +167,9 @@ def build_graph(
     consensus_model = _model("consensus", "claude-opus-4-6")
     graph.add_node(
         "consensus",
-        make_consensus_node(client, agent_loader, consensus_model),
+        make_consensus_node(
+            client, agent_loader, consensus_model, scaffold_budget_usd=scaffold_budget_usd
+        ),
     )
     graph.add_node("human_gate", make_human_gate_node(bot))
 

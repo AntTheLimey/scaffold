@@ -10,7 +10,12 @@ SYSTEM_PROMPT = (
 )
 
 
-def make_designer_node(client, agent_loader: AgentLoader, model: str = "claude-sonnet-4-6"):
+def make_designer_node(
+    client,
+    agent_loader: AgentLoader,
+    model: str = "claude-sonnet-4-6",
+    scaffold_budget_usd: float | None = None,
+):
     agent = AdvisorAgent(
         role="designer",
         model=model,
@@ -38,6 +43,8 @@ def make_designer_node(client, agent_loader: AgentLoader, model: str = "claude-s
             bus.api_call_done(
                 "designer", model, result.token_in, result.token_out, state["task_id"]
             )
+            if scaffold_budget_usd is not None:
+                bus.check_budget(scaffold_budget_usd)
             bus.node_exit("designer", state["task_id"])
         return {"agent_output": result.text}
 

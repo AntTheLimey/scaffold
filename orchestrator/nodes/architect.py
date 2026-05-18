@@ -13,7 +13,12 @@ SYSTEM_PROMPT = (
 )
 
 
-def make_architect_node(client, agent_loader: AgentLoader, model: str = "claude-opus-4-6"):
+def make_architect_node(
+    client,
+    agent_loader: AgentLoader,
+    model: str = "claude-opus-4-6",
+    scaffold_budget_usd: float | None = None,
+):
     agent = AdvisorAgent(
         role="architect",
         model=model,
@@ -50,6 +55,8 @@ def make_architect_node(client, agent_loader: AgentLoader, model: str = "claude-
             bus.api_call_done(
                 "architect", model, result.token_in, result.token_out, state["task_id"]
             )
+            if scaffold_budget_usd is not None:
+                bus.check_budget(scaffold_budget_usd)
 
         parsed = extract_json(result.text)
         output = {
