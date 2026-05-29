@@ -72,6 +72,10 @@ class AdvisorAgent:
         system_prompt: str,
         user_message: str,
         cache_system: bool = False,
+        tools: list[dict] | None = None,
+        tool_executor: callable | None = None,
+        task_id: str = "",
+        max_turns: int = 25,
     ) -> AgentResult:
         if cache_system:
             system = [
@@ -84,19 +88,79 @@ class AdvisorAgent:
         else:
             system = system_prompt
 
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=4096,
-            system=system,
-            messages=[{"role": "user", "content": user_message}],
-        )
-        token_in = response.usage.input_tokens
-        token_out = response.usage.output_tokens
+        messages = [{"role": "user", "content": user_message}]
+
+        if tools is None:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=system,
+                messages=messages,
+            )
+            token_in = response.usage.input_tokens
+            token_out = response.usage.output_tokens
+            return AgentResult(
+                text=response.content[0].text,
+                token_in=token_in,
+                token_out=token_out,
+                cost_usd=cost_for_tokens(self.model, token_in, token_out),
+            )
+
+        total_in = 0
+        total_out = 0
+        bus = get_bus()
+        for _turn in range(max_turns):
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=system,
+                messages=messages,
+                tools=tools,
+            )
+            total_in += response.usage.input_tokens
+            total_out += response.usage.output_tokens
+
+            if response.stop_reason != "tool_use":
+                text = ""
+                for block in response.content:
+                    if getattr(block, "type", None) == "text":
+                        text = block.text
+                        break
+                return AgentResult(
+                    text=text,
+                    token_in=total_in,
+                    token_out=total_out,
+                    cost_usd=cost_for_tokens(self.model, total_in, total_out),
+                )
+
+            messages.append({"role": "assistant", "content": response.content})
+            tool_results = []
+            for block in response.content:
+                if getattr(block, "type", None) != "tool_use":
+                    continue
+                output = tool_executor(block.name, block.input)
+                if bus:
+                    bus.tool_call(self.role, block.name, task_id)
+                tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": output,
+                    }
+                )
+            messages.append({"role": "user", "content": tool_results})
+
+        # max_turns exhausted — return whatever text we have
+        text = ""
+        for block in response.content:
+            if getattr(block, "type", None) == "text":
+                text = block.text
+                break
         return AgentResult(
-            text=response.content[0].text,
-            token_in=token_in,
-            token_out=token_out,
-            cost_usd=cost_for_tokens(self.model, token_in, token_out),
+            text=text,
+            token_in=total_in,
+            token_out=total_out,
+            cost_usd=cost_for_tokens(self.model, total_in, total_out),
         )
 
 
