@@ -1,5 +1,6 @@
 import json as _json
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -73,7 +74,7 @@ class AdvisorAgent:
         user_message: str,
         cache_system: bool = False,
         tools: list[dict] | None = None,
-        tool_executor: callable | None = None,
+        tool_executor: Callable[[str, dict], str] | None = None,
         task_id: str = "",
         max_turns: int = 25,
     ) -> AgentResult:
@@ -88,7 +89,7 @@ class AdvisorAgent:
         else:
             system = system_prompt
 
-        messages = [{"role": "user", "content": user_message}]
+        messages: list[dict] = [{"role": "user", "content": user_message}]
 
         if tools is None:
             response = self.client.messages.create(
@@ -106,8 +107,10 @@ class AdvisorAgent:
                 cost_usd=cost_for_tokens(self.model, token_in, token_out),
             )
 
+        assert tool_executor is not None
         total_in = 0
         total_out = 0
+        response = None
         bus = get_bus()
         for _turn in range(max_turns):
             response = self.client.messages.create(
@@ -150,8 +153,9 @@ class AdvisorAgent:
                 )
             messages.append({"role": "user", "content": tool_results})
 
-        # max_turns exhausted — return whatever text we have
         text = ""
+        if response is None:
+            return AgentResult(text="", token_in=0, token_out=0, cost_usd=0.0)
         for block in response.content:
             if getattr(block, "type", None) == "text":
                 text = block.text
