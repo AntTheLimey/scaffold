@@ -1,3 +1,4 @@
+import functools
 from pathlib import Path
 
 from orchestrator.agent_loader import AgentLoader
@@ -5,6 +6,7 @@ from orchestrator.event_bus import get_bus
 from orchestrator.json_utils import extract_json
 from orchestrator.nodes.base import AdvisorAgent
 from orchestrator.state import TaskState
+from orchestrator.tools import CODEBASE_TOOLS, execute_tool
 
 SYSTEM_PROMPT = (
     "You are a product decomposition engine. You break master specifications "
@@ -23,12 +25,15 @@ def make_product_owner_node(
     agent_loader: AgentLoader,
     model: str = "claude-opus-4-6",
     scaffold_budget_usd: float | None = None,
+    repo_path: str = "",
 ):
     agent = AdvisorAgent(
         role="product_owner",
         model=model,
         client=client,
     )
+    tool_executor = functools.partial(execute_tool, repo_path=repo_path) if repo_path else None
+    tools = CODEBASE_TOOLS if repo_path else None
 
     def product_owner_node(state: TaskState) -> dict:
         bus = get_bus()
@@ -61,6 +66,9 @@ def make_product_owner_node(
             system_prompt=system_prompt,
             user_message=user_message,
             cache_system=True,
+            tools=tools,
+            tool_executor=tool_executor,
+            task_id=state["task_id"],
         )
         if bus:
             bus.api_call_done(

@@ -122,7 +122,12 @@ def build_graph(
     graph.add_node(
         "product_owner",
         make_product_owner_node(
-            client, spec_path, agent_loader, po_model, scaffold_budget_usd=scaffold_budget_usd
+            client,
+            spec_path,
+            agent_loader,
+            po_model,
+            scaffold_budget_usd=scaffold_budget_usd,
+            repo_path=repo_path,
         ),
     )
     graph.add_node(
@@ -132,6 +137,7 @@ def build_graph(
             agent_loader,
             _model("architect", "claude-opus-4-6"),
             scaffold_budget_usd=scaffold_budget_usd,
+            repo_path=repo_path,
         ),
     )
     graph.add_node(
@@ -141,6 +147,7 @@ def build_graph(
             agent_loader,
             _model("designer", "claude-sonnet-4-6"),
             scaffold_budget_usd=scaffold_budget_usd,
+            repo_path=repo_path,
         ),
     )
     graph.add_node(

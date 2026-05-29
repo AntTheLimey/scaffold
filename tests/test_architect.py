@@ -122,3 +122,13 @@ def test_architect_no_budget_check_when_none(mock_client, mock_agent_loader):
         state = initial_state(task_id="feat-001", level="feature")
         node_fn(state)
     mock_bus.check_budget.assert_not_called()
+
+
+def test_architect_passes_tools_to_advisor(mock_client, mock_agent_loader):
+    node_fn = make_architect_node(mock_client, mock_agent_loader, repo_path="/tmp/repo")
+    state = initial_state(task_id="feat-001", level="feature")
+    node_fn(state)
+    call_args = mock_client.messages.create.call_args
+    assert "tools" in call_args.kwargs
+    tool_names = {t["name"] for t in call_args.kwargs["tools"]}
+    assert tool_names == {"read_file", "list_directory", "grep"}
