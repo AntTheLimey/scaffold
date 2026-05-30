@@ -44,6 +44,17 @@ def test_read_file_path_traversal_blocked(repo):
     assert "outside" in result
 
 
+def test_read_file_sibling_prefix_escape_blocked(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "safe.txt").write_text("safe\n")
+    sibling = tmp_path / "repo_evil"
+    sibling.mkdir()
+    (sibling / "secret.txt").write_text("stolen\n")
+    result = read_file(str(repo), "../repo_evil/secret.txt")
+    assert "outside" in result
+
+
 # --- list_directory ---
 
 
@@ -65,6 +76,16 @@ def test_list_directory_not_found(repo):
 
 def test_list_directory_path_traversal_blocked(repo):
     result = list_directory(str(repo), "../../")
+    assert "outside" in result
+
+
+def test_list_directory_sibling_prefix_escape_blocked(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    sibling = tmp_path / "repo_evil"
+    sibling.mkdir()
+    (sibling / "secret.txt").write_text("stolen\n")
+    result = list_directory(str(repo), "../repo_evil")
     assert "outside" in result
 
 
@@ -96,6 +117,17 @@ def test_grep_no_matches(repo):
 
 def test_grep_path_traversal_blocked(repo):
     result = grep(str(repo), "anything", path="../../etc")
+    assert "outside" in result
+
+
+def test_grep_sibling_prefix_escape_blocked(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "safe.txt").write_text("safe\n")
+    sibling = tmp_path / "repo_evil"
+    sibling.mkdir()
+    (sibling / "secret.txt").write_text("stolen\n")
+    result = grep(str(repo), "stolen", path="../repo_evil")
     assert "outside" in result
 
 

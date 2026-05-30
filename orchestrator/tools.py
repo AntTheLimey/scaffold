@@ -7,7 +7,7 @@ from pathlib import Path
 def _resolve_safe(repo_path: str, relative: str) -> Path | str:
     root = Path(repo_path).resolve()
     resolved = (root / relative).resolve()
-    if not str(resolved).startswith(str(root)):
+    if resolved != root and root not in resolved.parents:
         return f"error: path '{relative}' is outside the repository root"
     return resolved
 
@@ -45,23 +45,28 @@ def grep(repo_path: str, pattern: str, path: str = ".", max_results: int = 50) -
     if isinstance(result, str):
         return result
     resolved = result
-    proc = subprocess.run(
+    proc = subprocess.Popen(
         ["grep", "-rn", "--include=*", pattern, str(resolved)],
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        timeout=30,
     )
     root = Path(repo_path).resolve()
-    lines = []
-    for line in proc.stdout.splitlines():
+    lines: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        line = line.rstrip("\n")
         try:
             file_part, rest = line.split(":", 1)
             rel = Path(file_part).resolve().relative_to(root)
             lines.append(f"{rel}:{rest}")
         except (ValueError, TypeError):
             lines.append(line)
-    truncated = lines[:max_results]
-    return "\n".join(truncated)
+        if len(lines) >= max_results:
+            proc.terminate()
+            break
+    proc.wait()
+    return "\n".join(lines)
 
 
 CODEBASE_TOOLS: list[dict] = [
