@@ -42,8 +42,11 @@ Items are force-ranked by score. Higher score = do first.
 | Checkpoint resume UX | 3 | 2 | M (2) | 4.0 | Idea | Current resume requires knowing the thread ID and re-running with the right flags. Add `scaffold resume` that lists interrupted runs and lets you pick one. |
 | Human gate improvements | 3 | 2 | M (2) | 4.0 | Idea | Human gate currently escalates via Telegram. Add interactive terminal mode, approval timeouts, and context summaries so the operator can make informed decisions. |
 | Web dashboard + control plane | 5 | 4 | XL (4) | 3.5 | Idea | Web-based UI (lightweight Python web server) to monitor runs in real time, view agent events/tool calls/costs, inspect task trees, manage human gate approvals, and trigger/resume runs. Replaces CLI as the primary operator interface. |
-| Run isolation + stale cleanup | 3 | 3 | M (2) | 4.5 | Idea | `scaffold run` creates a new Root task but shares the DB with previous runs. Budget scoping counts all historical spend, not just the current run. Add a `run_id` concept that tags tasks/events per run, scope budget checks to the active run, and add `scaffold cleanup` to purge stale/abandoned runs. |
-| API cost tracking (Opus/advisor) | 4 | 4 | M (2) | 6.0 | Idea | Anthropic SDK returns token counts but not dollar amounts. Workflow agents (product_owner, architect, consensus) and advisory specialists (postgres-expert, security-auditor) run via API — their costs are invisible to the budget system. Add model pricing table + token-to-dollar conversion in api_call_done events. |
+| Run isolation + stale cleanup | 3 | 3 | M (2) | 4.5 | Partial | `scaffold clean` command added for worktree/branch/DB cleanup. Still needed: `run_id` concept to tag tasks/events per run and scope budget checks to the active run. |
+| API cost tracking (Opus/advisor) | 4 | 4 | M (2) | 6.0 | Done | Model pricing table + token-to-dollar conversion in api_call_done events. |
+| Timeout cost recovery | 4 | 5 | M (2) | 6.5 | Idea | When DoerAgent subprocess times out, the process is killed before emitting the final `result` JSON with `total_cost_usd`. The work was billed but the scaffold records $0. Parse incremental costs from streamed assistant events during the run, not just the final summary. Trial run 2 had 8 iterations at $0.00 that were actually billed. |
+| Per-iteration budget cap for CLI specialists | 4 | 4 | S (1) | 12.0 | Idea | Pass `--max-budget-usd` to each `claude -p` invocation to cap individual iterations. Trial run 2 saw single Sonnet iterations costing $4 on greenfield bootstrap. A $2/iteration cap would force the specialist to commit incremental progress rather than trying to build everything in one shot. |
+| Specialist selection by task domain | 5 | 4 | M (2) | 7.0 | Idea | Developer node picks specialist by file-extension matching, which fails on greenfield repos (no files yet) and domain-mismatch tasks (SQL schema routed to react-expert). The architect should declare which specialist to use in its output, or the specialist should be inferred from the task's domain keywords (schema/migration → go-expert or postgres-expert, not react-expert). Trial run 2: FitD schema task dispatched to react-expert, which built a Python scaffold copy instead of SQL. |
 | End-to-end integration test | 4 | 3 | L (3) | 3.7 | Idea | Run the full pipeline against a trivial test repo with mocked API/CLI responses. Current tests are unit-level only — no test covers the full graph traversal. |
 
 ## Completed
@@ -52,15 +55,17 @@ Items are force-ranked by score. Higher score = do first.
 |------|----|-------|
 | Observability: tool call logging + wallclock time | #3 | DoerAgent stream-json parsing, tool.call events, wallclock in report, tool_usage view |
 | Budget controls | #4 | Per-specialist --max-budget-usd, scaffold-level cumulative cost check, BudgetExceededError abort |
+| API cost tracking (Opus/advisor) | #5 | Model pricing table, token-to-dollar conversion in api_call_done events |
+| AdvisorAgent tool use | #5 | Multi-turn tool loop with read_file, list_directory, grep. PO/architect/designer read the codebase before deciding. |
+| Trial run 1 fixes | main | Reviewer worktree, developer git commit, language-aware specialist fallback, depends_on ordering, scaffold clean command |
 
 ## Notes
 
-- **AdvisorAgent tool use** is the most impactful single change. Workflow
-  agents currently make decisions about a codebase they can't see. The
-  architect designs without reading the code structure, the reviewer
-  evaluates without checking what was written. Do this immediately after
-  the observability PR lands.
-
-- **Observability and budget controls are done.** We can now see what
-  agents do (tool calls, wallclock time) and cap how much they spend
-  (per-specialist and scaffold-wide). Ready for a real test run.
+- **Trial run 2 results (2026-05-31):** PO decomposed into 6 features.
+  Feature 1 (DB schema) produced 2,052 lines of real SQL — the first
+  successful code output. Feature 2 (FitD reconciliation) built the wrong
+  thing (Python scaffold copy instead of SQL) due to specialist mismatch.
+  Features 3-6 hit API rate limit. Total tracked spend: $15.28, actual
+  likely $20-25. Fixes that worked: reviewer worktree, developer commit,
+  language detection. Next priorities: specialist selection by task domain,
+  per-iteration budget cap, timeout cost recovery.
