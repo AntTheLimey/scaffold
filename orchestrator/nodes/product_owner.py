@@ -15,7 +15,8 @@ SYSTEM_PROMPT = (
     "Architect's job. You never write code.\n\n"
     "Output valid JSON with a single key 'children', containing a list of objects. "
     "Each object has: title (str), level ('feature' or 'task'), spec_ref (str), "
-    "acceptance (list[str])."
+    "acceptance (list[str]), depends_on (list[str] — titles of sibling tasks that "
+    "must complete first; omit or empty list if no dependencies)."
 )
 
 

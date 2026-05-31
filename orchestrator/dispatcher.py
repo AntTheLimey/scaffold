@@ -11,6 +11,45 @@ from orchestrator.state import TaskState, initial_state
 from orchestrator.task_tree import TaskTree
 
 
+def _topo_sort(children: list[dict]) -> list[dict]:
+    """Sort children by depends_on. Tasks with no dependencies come first.
+    Falls back to original order if depends_on is not used or on cycles."""
+    if not any(c.get("depends_on") for c in children if isinstance(c, dict)):
+        return children
+
+    title_to_idx: dict[str, int] = {}
+    for i, c in enumerate(children):
+        if isinstance(c, dict):
+            title_to_idx[c.get("title", "")] = i
+
+    in_degree: dict[int, int] = {i: 0 for i in range(len(children))}
+    graph: dict[int, list[int]] = {i: [] for i in range(len(children))}
+    for i, c in enumerate(children):
+        if not isinstance(c, dict):
+            continue
+        for dep_title in c.get("depends_on", []):
+            dep_idx = title_to_idx.get(dep_title)
+            if dep_idx is not None:
+                graph[dep_idx].append(i)
+                in_degree[i] += 1
+
+    queue = [i for i in range(len(children)) if in_degree[i] == 0]
+    sorted_indices: list[int] = []
+    while queue:
+        queue.sort()
+        node = queue.pop(0)
+        sorted_indices.append(node)
+        for neighbor in graph[node]:
+            in_degree[neighbor] -= 1
+            if in_degree[neighbor] == 0:
+                queue.append(neighbor)
+
+    if len(sorted_indices) != len(children):
+        return children
+
+    return [children[i] for i in sorted_indices]
+
+
 def _normalize_acceptance(raw: object) -> list[str]:
     if raw is None:
         return []
@@ -62,6 +101,7 @@ def run_task(
         return {"status": "stuck", "child_tasks": []}
 
     children = result.get("child_tasks", [])
+    children = _topo_sort(children)
     if not children:
         tree.update_status(state["task_id"], result.get("status", "done"))
         if bus:

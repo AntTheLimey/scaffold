@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 from orchestrator.budget import BudgetExceededError
-from orchestrator.dispatcher import _normalize_acceptance, run_task
+from orchestrator.dispatcher import _normalize_acceptance, _topo_sort, run_task
 from orchestrator.state import initial_state
 
 
@@ -334,3 +334,75 @@ def test_normalize_acceptance_variants():
     assert _normalize_acceptance('["x","y"]') == ["x", "y"]
     assert _normalize_acceptance("plain text criterion") == ["plain text criterion"]
     assert _normalize_acceptance(42) == []
+
+
+def test_topo_sort_basic():
+    children = [
+        {"title": "B", "depends_on": ["A"]},
+        {"title": "A"},
+        {"title": "C", "depends_on": ["A", "B"]},
+    ]
+    result = _topo_sort(children)
+    titles = [c["title"] for c in result]
+    assert titles.index("A") < titles.index("B")
+    assert titles.index("B") < titles.index("C")
+
+
+def test_topo_sort_no_dependencies():
+    children = [
+        {"title": "A"},
+        {"title": "B"},
+        {"title": "C"},
+    ]
+    result = _topo_sort(children)
+    assert [c["title"] for c in result] == ["A", "B", "C"]
+
+
+def test_topo_sort_cycle_falls_back():
+    children = [
+        {"title": "A", "depends_on": ["B"]},
+        {"title": "B", "depends_on": ["A"]},
+    ]
+    result = _topo_sort(children)
+    assert result == children
+
+
+def test_run_task_respects_depends_on_ordering(db):
+    from orchestrator.task_tree import TaskTree
+
+    tree = TaskTree(db)
+    parent_id = tree.create(title="Epic", level="epic")
+
+    execution_order = []
+    graph = MagicMock()
+
+    def mock_invoke(state, config=None):
+        if state["level"] == "epic":
+            return {
+                "status": "decomposing",
+                "child_tasks": [
+                    {"title": "Seed data", "level": "task", "depends_on": ["Schema"]},
+                    {"title": "Schema", "level": "task"},
+                    {"title": "Auth", "level": "task", "depends_on": ["Schema"]},
+                ],
+                "project_context": "",
+                "specialists": [],
+                "advisory": [],
+                "detected_languages": [],
+                "test_framework": "",
+            }
+        # Extract title from agent_output
+        title = state.get("agent_output", "").split("\n")[0].replace("# ", "")
+        execution_order.append(title)
+        return {"status": "done", "child_tasks": []}
+
+    graph.invoke.side_effect = mock_invoke
+
+    state = initial_state(task_id=parent_id, level="epic")
+    run_task(graph, tree, state, parent_id)
+
+    schema_idx = execution_order.index("Schema")
+    seed_idx = execution_order.index("Seed data")
+    auth_idx = execution_order.index("Auth")
+    assert schema_idx < seed_idx
+    assert schema_idx < auth_idx
