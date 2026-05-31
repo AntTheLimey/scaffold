@@ -1,4 +1,5 @@
 import subprocess
+from pathlib import Path
 
 from orchestrator.agent_loader import AgentLoader
 from orchestrator.event_bus import get_bus
@@ -13,12 +14,17 @@ REVIEW_PROMPT = (
 )
 
 
+def _reviewer_worktree_path(repo_path: str, branch: str) -> Path:
+    return Path(repo_path).parent / f".worktrees/review-{branch.replace('/', '-')}"
+
+
 def make_reviewer_node(repo_path: str, branch_prefix: str, model: str, agent_loader: AgentLoader):
     def reviewer_node(state: TaskState) -> dict:
         bus = get_bus()
         if bus:
             bus.node_enter("reviewer", state["task_id"])
         branch = f"{branch_prefix}/{state['task_id']}"
+        worktree_path = _reviewer_worktree_path(repo_path, branch)
 
         base_prompt = agent_loader.load_workflow_agent("reviewer") or REVIEW_PROMPT
 
@@ -32,15 +38,29 @@ def make_reviewer_node(repo_path: str, branch_prefix: str, model: str, agent_loa
             f"Review the current changes on branch '{branch}'."
         )
 
-        if bus:
-            bus.cli_start("reviewer", model, 1, state["task_id"])
-        result = subprocess.run(
-            ["claude", "-p", prompt, "--model", model],
-            capture_output=True,
-            text=True,
+        subprocess.run(
+            ["git", "worktree", "add", str(worktree_path), branch],
             cwd=repo_path,
-            timeout=300,
+            capture_output=True,
+            check=True,
         )
+
+        try:
+            if bus:
+                bus.cli_start("reviewer", model, 1, state["task_id"])
+            result = subprocess.run(
+                ["claude", "-p", prompt, "--model", model],
+                capture_output=True,
+                text=True,
+                cwd=str(worktree_path),
+                timeout=300,
+            )
+        finally:
+            subprocess.run(
+                ["git", "worktree", "remove", str(worktree_path)],
+                cwd=repo_path,
+                capture_output=True,
+            )
 
         parsed = extract_json(result.stdout)
         verdict = parsed.get("verdict", "revise")

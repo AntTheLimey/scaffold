@@ -1,7 +1,8 @@
+import contextlib
 import json
 from unittest.mock import MagicMock, patch
 
-from orchestrator.nodes.reviewer import make_reviewer_node
+from orchestrator.nodes.reviewer import _reviewer_worktree_path, make_reviewer_node
 from orchestrator.state import initial_state
 
 
@@ -11,13 +12,28 @@ def _make_mock_loader(prompt: str = "loaded reviewer prompt") -> MagicMock:
     return loader
 
 
+def _worktree_side_effect(claude_stdout: str, returncode: int = 0):
+    """Return a side_effect function that routes subprocess.run calls correctly.
+
+    Call order:
+      1. git worktree add  → success (returncode 0)
+      2. claude -p         → the review output
+      3. git worktree remove → success (returncode 0)
+    """
+    git_ok = MagicMock(stdout="", stderr="", returncode=0)
+    claude_result = MagicMock(stdout=claude_stdout, stderr="", returncode=returncode)
+
+    def _side_effect(cmd, **kwargs):
+        if cmd[0] == "git":
+            return git_ok
+        return claude_result
+
+    return _side_effect
+
+
 @patch("orchestrator.nodes.reviewer.subprocess.run")
 def test_reviewer_approves(mock_run):
-    mock_run.return_value = MagicMock(
-        stdout=json.dumps({"verdict": "approve", "feedback": ""}),
-        stderr="",
-        returncode=0,
-    )
+    mock_run.side_effect = _worktree_side_effect(json.dumps({"verdict": "approve", "feedback": ""}))
     node_fn = make_reviewer_node(
         repo_path="/tmp/repo",
         branch_prefix="scaffold",
@@ -33,12 +49,10 @@ def test_reviewer_approves(mock_run):
 
 @patch("orchestrator.nodes.reviewer.subprocess.run")
 def test_reviewer_requests_revision(mock_run):
-    mock_run.return_value = MagicMock(
-        stdout=json.dumps(
+    mock_run.side_effect = _worktree_side_effect(
+        json.dumps(
             {"verdict": "revise", "feedback": "Missing input validation on invite code endpoint."}
-        ),
-        stderr="",
-        returncode=0,
+        )
     )
     node_fn = make_reviewer_node(
         repo_path="/tmp/repo",
@@ -56,11 +70,7 @@ def test_reviewer_requests_revision(mock_run):
 
 @patch("orchestrator.nodes.reviewer.subprocess.run")
 def test_reviewer_uses_configured_branch_prefix(mock_run):
-    mock_run.return_value = MagicMock(
-        stdout=json.dumps({"verdict": "approve", "feedback": ""}),
-        stderr="",
-        returncode=0,
-    )
+    mock_run.side_effect = _worktree_side_effect(json.dumps({"verdict": "approve", "feedback": ""}))
     node_fn = make_reviewer_node(
         repo_path="/tmp/repo",
         branch_prefix="custom-prefix",
@@ -69,18 +79,15 @@ def test_reviewer_uses_configured_branch_prefix(mock_run):
     )
     state = initial_state(task_id="task-001", level="task")
     node_fn(state)
-    call_args = mock_run.call_args
-    prompt_text = " ".join(call_args.args[0])
+    # The claude call is the second call (index 1)
+    claude_call = mock_run.call_args_list[1]
+    prompt_text = " ".join(claude_call.args[0])
     assert "custom-prefix/task-001" in prompt_text
 
 
 @patch("orchestrator.nodes.reviewer.subprocess.run")
 def test_reviewer_uses_agent_loader(mock_run):
-    mock_run.return_value = MagicMock(
-        stdout=json.dumps({"verdict": "approve", "feedback": ""}),
-        stderr="",
-        returncode=0,
-    )
+    mock_run.side_effect = _worktree_side_effect(json.dumps({"verdict": "approve", "feedback": ""}))
     loader = _make_mock_loader("my custom reviewer prompt")
     node_fn = make_reviewer_node(
         repo_path="/tmp/repo",
@@ -91,18 +98,14 @@ def test_reviewer_uses_agent_loader(mock_run):
     state = initial_state(task_id="task-001", level="task")
     node_fn(state)
     loader.load_workflow_agent.assert_called_once_with("reviewer")
-    call_args = mock_run.call_args
-    prompt_text = " ".join(call_args.args[0])
+    claude_call = mock_run.call_args_list[1]
+    prompt_text = " ".join(claude_call.args[0])
     assert "my custom reviewer prompt" in prompt_text
 
 
 @patch("orchestrator.nodes.reviewer.subprocess.run")
 def test_reviewer_appends_project_context(mock_run):
-    mock_run.return_value = MagicMock(
-        stdout=json.dumps({"verdict": "approve", "feedback": ""}),
-        stderr="",
-        returncode=0,
-    )
+    mock_run.side_effect = _worktree_side_effect(json.dumps({"verdict": "approve", "feedback": ""}))
     node_fn = make_reviewer_node(
         repo_path="/tmp/repo",
         branch_prefix="scaffold",
@@ -112,18 +115,14 @@ def test_reviewer_appends_project_context(mock_run):
     state = initial_state(task_id="task-001", level="task")
     state["project_context"] = "Use strict type checking throughout."
     node_fn(state)
-    call_args = mock_run.call_args
-    prompt_text = " ".join(call_args.args[0])
+    claude_call = mock_run.call_args_list[1]
+    prompt_text = " ".join(claude_call.args[0])
     assert "Use strict type checking throughout." in prompt_text
 
 
 @patch("orchestrator.nodes.reviewer.subprocess.run")
 def test_reviewer_falls_back_to_inline_prompt(mock_run):
-    mock_run.return_value = MagicMock(
-        stdout=json.dumps({"verdict": "approve", "feedback": ""}),
-        stderr="",
-        returncode=0,
-    )
+    mock_run.side_effect = _worktree_side_effect(json.dumps({"verdict": "approve", "feedback": ""}))
     loader = _make_mock_loader("")  # empty string — loader has no agent file
     node_fn = make_reviewer_node(
         repo_path="/tmp/repo",
@@ -133,6 +132,60 @@ def test_reviewer_falls_back_to_inline_prompt(mock_run):
     )
     state = initial_state(task_id="task-001", level="task")
     node_fn(state)
-    call_args = mock_run.call_args
-    prompt_text = " ".join(call_args.args[0])
+    claude_call = mock_run.call_args_list[1]
+    prompt_text = " ".join(claude_call.args[0])
     assert "code review engine" in prompt_text
+
+
+@patch("orchestrator.nodes.reviewer.subprocess.run")
+def test_reviewer_runs_in_worktree(mock_run):
+    """claude -p must run with cwd set to the worktree path, not repo_path."""
+    mock_run.side_effect = _worktree_side_effect(json.dumps({"verdict": "approve", "feedback": ""}))
+    node_fn = make_reviewer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        model="claude-sonnet-4-20250514",
+        agent_loader=_make_mock_loader(),
+    )
+    state = initial_state(task_id="task-001", level="task")
+    node_fn(state)
+
+    expected_worktree = str(_reviewer_worktree_path("/tmp/repo", "scaffold/task-001"))
+    claude_call = mock_run.call_args_list[1]
+    assert claude_call.kwargs["cwd"] == expected_worktree
+    # Must NOT run in the main repo path
+    assert claude_call.kwargs["cwd"] != "/tmp/repo"
+
+
+@patch("orchestrator.nodes.reviewer.subprocess.run")
+def test_reviewer_cleans_up_worktree(mock_run):
+    """git worktree remove must be called even when claude raises an exception."""
+    git_ok = MagicMock(stdout="", stderr="", returncode=0)
+
+    call_count = {"n": 0}
+
+    def _failing_side_effect(cmd, **kwargs):
+        call_count["n"] += 1
+        if cmd[0] == "git":
+            return git_ok
+        # claude call raises
+        raise RuntimeError("claude crashed")
+
+    mock_run.side_effect = _failing_side_effect
+
+    node_fn = make_reviewer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        model="claude-sonnet-4-20250514",
+        agent_loader=_make_mock_loader(),
+    )
+    state = initial_state(task_id="task-001", level="task")
+
+    with contextlib.suppress(RuntimeError):
+        node_fn(state)
+
+    # Calls: worktree add, claude (raises), worktree remove
+    assert call_count["n"] == 3
+    remove_call = mock_run.call_args_list[2]
+    assert remove_call.args[0][0] == "git"
+    assert "remove" in remove_call.args[0]
