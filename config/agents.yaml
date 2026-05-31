@@ -57,6 +57,7 @@ specialists:
     execution: cli
     max_iterations: 5
     completion_promise: "TASK COMPLETE"
+    max_budget_usd: 2.00
   security-auditor:
     model: claude-opus-4-6
     execution: api
