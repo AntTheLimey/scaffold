@@ -27,24 +27,28 @@ specialists:
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
     timeout: 1800
+    max_budget_usd: 2.00
   go-expert:
     model: claude-sonnet-4-6
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
     timeout: 1800
+    max_budget_usd: 2.00
   react-expert:
     model: claude-sonnet-4-6
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
     timeout: 1800
+    max_budget_usd: 2.00
   typescript-expert:
     model: claude-sonnet-4-6
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
     timeout: 1800
+    max_budget_usd: 2.00
   postgres-expert:
     model: claude-opus-4-6
     execution: api
