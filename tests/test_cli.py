@@ -534,6 +534,26 @@ def test_cli_run_project_not_found(runner, tmp_path):
     assert result.exit_code != 0
 
 
+def test_clean_command_exists(runner):
+    result = runner.invoke(cli, ["clean", "--help"])
+    assert result.exit_code == 0
+
+
+def test_clean_nothing_to_clean(runner, tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    with patch("subprocess.run") as mock_sp:
+        mock_sp.side_effect = [
+            MagicMock(stdout="", returncode=0),  # git worktree list
+            MagicMock(stdout="", returncode=0),  # git branch --list
+        ]
+        result = runner.invoke(
+            cli, ["clean", "--repo", str(repo), "--db", str(tmp_path / "missing.db")]
+        )
+    assert result.exit_code == 0
+    assert "Nothing to clean" in result.output
+
+
 def test_cli_run_budget_exceeded_exits_nonzero(runner, tmp_path, config_dir):
     spec = tmp_path / "spec.md"
     spec.write_text("# Test Spec")

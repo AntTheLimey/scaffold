@@ -313,6 +313,92 @@ def pause(db):
     click.echo("Scaffold paused. Run 'scaffold resume' to continue.")
 
 
+@cli.command()
+@click.option("--repo", required=True, type=click.Path(exists=True), help="Path to target repo")
+@click.option("--db", default="scaffold.db", help="Path to scaffold database to remove")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompt")
+def clean(repo, db, yes):
+    """Clean up worktrees and database from a previous run."""
+    import subprocess as sp
+
+    repo_path = Path(repo).resolve()
+
+    # List scaffold worktrees
+    result = sp.run(
+        ["git", "worktree", "list"],
+        cwd=str(repo_path),
+        capture_output=True,
+        text=True,
+    )
+    worktree_lines = [
+        line
+        for line in result.stdout.splitlines()
+        if "scaffold" in line.lower() and str(repo_path) not in line.split()[0]
+    ]
+
+    # List scaffold branches
+    branch_result = sp.run(
+        ["git", "branch", "--list", "scaffold/*"],
+        cwd=str(repo_path),
+        capture_output=True,
+        text=True,
+    )
+    branches = [b.strip().lstrip("+ ") for b in branch_result.stdout.splitlines() if b.strip()]
+
+    db_path = Path(db)
+    checkpoint_path = Path(_checkpoint_path(db))
+
+    if not worktree_lines and not branches and not db_path.exists():
+        click.echo("Nothing to clean.")
+        return
+
+    click.echo("Will remove:")
+    for line in worktree_lines:
+        click.echo(f"  worktree: {line.split()[0]}")
+    for branch in branches:
+        click.echo(f"  branch: {branch}")
+    if db_path.exists():
+        click.echo(f"  database: {db}")
+    if checkpoint_path.exists():
+        click.echo(f"  checkpoints: {checkpoint_path}")
+
+    if not yes:
+        click.confirm("Proceed?", abort=True)
+
+    for line in worktree_lines:
+        wt_path = line.split()[0]
+        sp.run(
+            ["git", "worktree", "remove", "--force", wt_path],
+            cwd=str(repo_path),
+            capture_output=True,
+        )
+        click.echo(f"  removed worktree: {wt_path}")
+
+    sp.run(["git", "worktree", "prune"], cwd=str(repo_path), capture_output=True)
+
+    for branch in branches:
+        sp.run(
+            ["git", "branch", "-D", branch],
+            cwd=str(repo_path),
+            capture_output=True,
+        )
+        click.echo(f"  deleted branch: {branch}")
+
+    if db_path.exists():
+        db_path.unlink()
+        click.echo(f"  removed database: {db}")
+    if checkpoint_path.exists():
+        checkpoint_path.unlink()
+        click.echo(f"  removed checkpoints: {checkpoint_path}")
+
+    for suffix in ["-wal", "-shm"]:
+        wal_path = Path(f"{db}{suffix}")
+        if wal_path.exists():
+            wal_path.unlink()
+
+    click.echo("Clean complete.")
+
+
 def main():
     cli()
 
