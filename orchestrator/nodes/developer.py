@@ -8,6 +8,13 @@ from orchestrator.event_bus import get_bus
 from orchestrator.nodes.base import AdvisorAgent, DoerAgent
 from orchestrator.state import TaskState
 
+LANGUAGE_TO_SPECIALIST: dict[str, str] = {
+    "python": "python-expert",
+    "go": "go-expert",
+    "typescript": "typescript-expert",
+    "javascript": "typescript-expert",
+}
+
 
 def _extract_file_paths(text: str) -> list[str]:
     """Extract file paths from text using regex."""
@@ -49,6 +56,13 @@ def make_developer_node(
             specialist_name = detected
         if not specialist_name and specialist_names:
             specialist_name = specialist_names[0]
+        if not specialist_name:
+            detected_langs = state.get("detected_languages", [])
+            for lang in detected_langs:
+                candidate = LANGUAGE_TO_SPECIALIST.get(lang)
+                if candidate and candidate in agents_config.specialists:
+                    specialist_name = candidate
+                    break
         if not specialist_name:
             specialist_name = "python-expert"
 

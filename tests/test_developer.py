@@ -308,6 +308,72 @@ def test_developer_fallback_to_python_expert(mock_doer, mock_advisor, agent_load
     )
 
 
+def test_developer_fallback_uses_detected_languages(
+    mock_doer, mock_advisor, agent_loader, agents_config
+):
+    """Developer uses first matching detected_language when specialists list is empty."""
+    agent_loader.detect_specialist.return_value = ""
+    agents_config.specialists["go-expert"] = {
+        "model": "claude-sonnet-4-6",
+        "execution": "cli",
+        "max_iterations": 10,
+        "completion_promise": "TASK COMPLETE",
+    }
+
+    node_fn = make_developer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        agent_loader=agent_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-lang-fallback", level="task")
+    state["specialists"] = []
+    state["detected_languages"] = ["go", "typescript"]
+    state["agent_output"] = "Do something with no file extensions mentioned"
+
+    result = node_fn(state)
+
+    assert result["status"] == "in_review"
+    mock_doer.assert_called_once_with(
+        role="go-expert",
+        model="claude-sonnet-4-6",
+        max_iterations=10,
+        completion_promise="TASK COMPLETE",
+        max_budget_usd=None,
+        timeout=600,
+    )
+
+
+def test_developer_fallback_python_when_no_languages(
+    mock_doer, mock_advisor, agent_loader, agents_config
+):
+    """Developer falls back to python-expert when detected_languages is empty."""
+    agent_loader.detect_specialist.return_value = ""
+
+    node_fn = make_developer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        agent_loader=agent_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-no-lang-fallback", level="task")
+    state["specialists"] = []
+    state["detected_languages"] = []
+    state["agent_output"] = "Do something with no file extensions mentioned"
+
+    result = node_fn(state)
+
+    assert result["status"] == "in_review"
+    mock_doer.assert_called_once_with(
+        role="python-expert",
+        model="claude-sonnet-4-6",
+        max_iterations=10,
+        completion_promise="TASK COMPLETE",
+        max_budget_usd=None,
+        timeout=600,
+    )
+
+
 def test_developer_passes_max_budget_to_doer(mock_doer, mock_advisor, agent_loader, agents_config):
     agents_config.specialists["python-expert"]["max_budget_usd"] = 2.00
     node_fn = make_developer_node(
