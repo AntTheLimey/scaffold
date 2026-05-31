@@ -13,7 +13,12 @@ SYSTEM_PROMPT = (
 MAX_ROUNDS = 2
 
 
-def make_consensus_node(client, agent_loader: AgentLoader, model: str = "claude-opus-4-6"):
+def make_consensus_node(
+    client,
+    agent_loader: AgentLoader,
+    model: str = "claude-opus-4-6",
+    scaffold_budget_usd: float | None = None,
+):
     agent = AdvisorAgent(
         role="consensus",
         model=model,
@@ -44,6 +49,8 @@ def make_consensus_node(client, agent_loader: AgentLoader, model: str = "claude-
                 result = agent.call(system_prompt=system_prompt, user_message=prompt)
                 if bus:
                     bus.api_call_done("consensus", model, result.token_in, result.token_out, tid)
+                    if scaffold_budget_usd is not None:
+                        bus.check_budget(scaffold_budget_usd)
                 parsed = extract_json(result.text)
                 if not parsed:
                     continue

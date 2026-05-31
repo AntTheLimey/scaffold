@@ -83,7 +83,10 @@ def test_preflight_telegram_optional(valid_config):
     with (
         patch("orchestrator.preflight.shutil.which", return_value="/usr/bin/claude"),
         patch("orchestrator.preflight.subprocess.run") as mock_run,
-        patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test-key"}),
+        patch.dict(
+            os.environ,
+            {"ANTHROPIC_API_KEY": "sk-test-key", "TELEGRAM_BOT_TOKEN": "", "TELEGRAM_CHAT_ID": ""},
+        ),
     ):
         mock_run.return_value = type("R", (), {"returncode": 0, "stdout": "user"})()
         result = run_preflight(valid_config)

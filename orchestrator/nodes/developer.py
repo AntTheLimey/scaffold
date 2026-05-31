@@ -78,6 +78,8 @@ def make_developer_node(
                         bus.api_call_done(
                             adv_name, adv_model, result.token_in, result.token_out, tid
                         )
+                        if scaffold_budget_usd is not None:
+                            bus.check_budget(scaffold_budget_usd)
                     recommendations.append(result.text)
             if recommendations:
                 advisory_input = "\n\n".join(recommendations)

@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -149,3 +149,18 @@ def test_human_gate_routes_cancel_to_end():
     state = initial_state(task_id="t1", level="task")
     state["verdict"] = "Cancel"
     assert human_gate_router(state) == "__end__"
+
+
+def test_graph_passes_repo_path_to_strategic_nodes(mock_deps):
+    with (
+        patch("orchestrator.graph.make_product_owner_node") as mock_po,
+        patch("orchestrator.graph.make_architect_node") as mock_arch,
+        patch("orchestrator.graph.make_designer_node") as mock_des,
+    ):
+        mock_po.return_value = lambda state: state
+        mock_arch.return_value = lambda state: state
+        mock_des.return_value = lambda state: state
+        build_graph(**mock_deps)
+        assert mock_po.call_args.kwargs.get("repo_path") == "/tmp/repo"
+        assert mock_arch.call_args.kwargs.get("repo_path") == "/tmp/repo"
+        assert mock_des.call_args.kwargs.get("repo_path") == "/tmp/repo"

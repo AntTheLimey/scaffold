@@ -225,3 +225,37 @@ def test_check_budget_raises_when_over_limit(db):
         bus.check_budget(5.00)
     assert exc_info.value.spent >= 5.00
     assert exc_info.value.limit == 5.00
+
+
+def test_api_call_done_includes_cost_usd():
+    conn = _make_db()
+    bus = EventBus(conn)
+    with patch("orchestrator.event_bus.click"):
+        bus.api_call_done("architect", "claude-sonnet-4-6", 1_000_000, 1_000_000, "t-20")
+    events = _get_events(conn)
+    resp = next(e for e in events if e["event_type"] == "api.response")
+    data = json.loads(resp["event_data"])
+    assert "cost_usd" in data
+    assert data["cost_usd"] == pytest.approx(18.0)
+
+
+def test_api_call_done_unknown_model_cost_zero():
+    conn = _make_db()
+    bus = EventBus(conn)
+    with patch("orchestrator.event_bus.click"):
+        bus.api_call_done("architect", "unknown-model", 100_000, 50_000, "t-21")
+    events = _get_events(conn)
+    data = json.loads(events[0]["event_data"])
+    assert data["cost_usd"] == 0.0
+
+
+def test_api_call_done_cost_counted_in_budget_check(db):
+    _insert_task(db, "t-22")
+    bus = EventBus(db)
+    with patch("orchestrator.event_bus.click"):
+        # ~$4.50 from API (1.5M sonnet tokens at $3/$15 per M = 3*1.5 + 0 = $4.50)
+        bus.api_call_done("architect", "claude-sonnet-4-6", 1_500_000, 0, "t-22")
+        bus.cli_done("developer", 1, True, "t-22", cost_usd=1.00)
+    with pytest.raises(BudgetExceededError) as exc_info:
+        bus.check_budget(5.00)
+    assert exc_info.value.spent == pytest.approx(5.50)

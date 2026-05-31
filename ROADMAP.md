@@ -33,7 +33,7 @@ Items are force-ranked by score. Higher score = do first.
 
 | Item | Impact | Urgency | Effort | Score | Status | Notes |
 |------|:------:|:-------:|:------:|:-----:|--------|-------|
-| AdvisorAgent tool use | 5 | 5 | L (3) | 5.0 | Planned | Workflow agents (architect, reviewer, qa) are blind — they can't read the codebase, query MCP servers, or use any tools. Add a tool execution loop to AdvisorAgent.call() with per-agent tool rosters. Single highest-impact improvement to scaffold output quality. |
+| AdvisorAgent tool use | 5 | 5 | L (3) | 5.0 | Done | Multi-turn tool loop in AdvisorAgent.call() with three read-only codebase tools (read_file, list_directory, grep). PO, architect, and designer nodes wired with repo-scoped tools. |
 | Cost estimation (pre-run) | 2 | 2 | M (2) | 3.0 | Idea | Estimate cost before running (model prices x estimated tokens). Budget controls are done; this adds pre-run estimation only. |
 | Structured output for AdvisorAgents | 4 | 3 | M (2) | 5.5 | Idea | Replace JSON-in-text extraction (regex on response.content[0].text) with Anthropic's structured output or tool_use for schema-enforced responses. Eliminates parse failures and retries. |
 | Agent memory / cross-run context | 4 | 2 | L (3) | 3.3 | Idea | Persist lessons learned across runs — what patterns worked, what the codebase looks like, what failed last time. Currently every run starts cold. |

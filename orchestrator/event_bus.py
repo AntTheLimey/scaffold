@@ -61,6 +61,9 @@ class EventBus:
         token_out: int,
         task_id: str,
     ) -> None:
+        from orchestrator.budget import cost_for_tokens
+
+        cost_usd = cost_for_tokens(model, token_in, token_out)
         self.emit(
             "api.response",
             agent_role=agent_role,
@@ -68,6 +71,7 @@ class EventBus:
             model=model,
             token_in=token_in,
             token_out=token_out,
+            cost_usd=cost_usd,
         )
 
     def cli_start(self, agent_role: str, model: str, iteration: int, task_id: str) -> None:

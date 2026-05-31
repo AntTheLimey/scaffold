@@ -1,8 +1,9 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from orchestrator.budget import BudgetExceededError
 from orchestrator.nodes.product_owner import make_product_owner_node
 from orchestrator.state import initial_state
 
@@ -46,8 +47,10 @@ def mock_agent_loader():
     return loader
 
 
-def make_node(mock_client, mock_agent_loader, spec_path="/tmp/spec.md"):
-    return make_product_owner_node(mock_client, spec_path=spec_path, agent_loader=mock_agent_loader)
+def make_node(mock_client, mock_agent_loader, spec_path="/tmp/spec.md", **kwargs):
+    return make_product_owner_node(
+        mock_client, spec_path=spec_path, agent_loader=mock_agent_loader, **kwargs
+    )
 
 
 def test_product_owner_decomposes_epic(mock_client, mock_agent_loader):
@@ -99,3 +102,33 @@ def test_product_owner_appends_project_context(mock_client, mock_agent_loader):
     system_arg = call_args.kwargs["system"]
     system_text = system_arg[0]["text"] if isinstance(system_arg, list) else system_arg
     assert "This project builds a VTT platform." in system_text
+
+
+def test_product_owner_checks_budget_after_api_call(mock_client, mock_agent_loader):
+    mock_bus = MagicMock()
+    mock_bus.check_budget.side_effect = BudgetExceededError(spent=6.0, limit=5.0)
+    with patch("orchestrator.nodes.product_owner.get_bus", return_value=mock_bus):
+        node_fn = make_node(mock_client, mock_agent_loader, scaffold_budget_usd=5.0)
+        state = initial_state(task_id="epic-001", level="epic")
+        with pytest.raises(BudgetExceededError):
+            node_fn(state)
+    mock_bus.check_budget.assert_called_once_with(5.0)
+
+
+def test_product_owner_no_budget_check_when_none(mock_client, mock_agent_loader):
+    mock_bus = MagicMock()
+    with patch("orchestrator.nodes.product_owner.get_bus", return_value=mock_bus):
+        node_fn = make_node(mock_client, mock_agent_loader)
+        state = initial_state(task_id="epic-001", level="epic")
+        node_fn(state)
+    mock_bus.check_budget.assert_not_called()
+
+
+def test_product_owner_passes_tools_to_advisor(mock_client, mock_agent_loader):
+    node_fn = make_node(mock_client, mock_agent_loader, repo_path="/tmp/repo")
+    state = initial_state(task_id="epic-001", level="epic")
+    node_fn(state)
+    call_args = mock_client.messages.create.call_args
+    assert "tools" in call_args.kwargs
+    tool_names = {t["name"] for t in call_args.kwargs["tools"]}
+    assert tool_names == {"read_file", "list_directory", "grep"}
