@@ -1,4 +1,5 @@
 import re
+import subprocess
 from pathlib import Path
 
 from orchestrator.agent_loader import AgentLoader
@@ -127,6 +128,19 @@ def make_developer_node(
                 task_id=state["task_id"],
                 scaffold_budget_usd=scaffold_budget_usd,
             )
+
+            if result.success:
+                subprocess.run(
+                    ["git", "add", "-A"],
+                    cwd=str(worktree_path),
+                    capture_output=True,
+                    check=True,
+                )
+                subprocess.run(
+                    ["git", "commit", "-m", f"feat: {state['task_id']} implementation"],
+                    cwd=str(worktree_path),
+                    capture_output=True,
+                )
         finally:
             doer.cleanup_worktree(repo_path, worktree_path)
 

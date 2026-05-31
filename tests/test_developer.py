@@ -45,7 +45,10 @@ def agent_loader():
 
 @pytest.fixture
 def mock_doer():
-    with patch("orchestrator.nodes.developer.DoerAgent") as MockDoer:
+    with (
+        patch("orchestrator.nodes.developer.DoerAgent") as MockDoer,
+        patch("orchestrator.nodes.developer.subprocess"),
+    ):
         doer = MockDoer.return_value
         doer.ralph_loop.return_value = RalphResult(
             success=True, iterations=2, output="Code written.\nTASK COMPLETE"
@@ -457,6 +460,61 @@ def test_developer_checks_budget_after_advisory_api_call(
         with pytest.raises(BudgetExceededError):
             node_fn(state)
     mock_bus.check_budget.assert_called_with(5.0)
+
+
+def test_developer_commits_after_success(mock_doer, mock_advisor, agent_loader, agents_config):
+    """Developer runs git add -A and git commit in the worktree after a successful ralph_loop."""
+    with patch("orchestrator.nodes.developer.subprocess") as mock_subprocess:
+        node_fn = make_developer_node(
+            repo_path="/tmp/repo",
+            branch_prefix="scaffold",
+            agent_loader=agent_loader,
+            agents_config=agents_config,
+        )
+        state = initial_state(task_id="task-commit-success", level="task")
+        state["specialists"] = ["python-expert"]
+        state["agent_output"] = "Update main.py"
+
+        result = node_fn(state)
+
+        assert result["status"] == "in_review"
+        worktree = Path("/tmp/worktree")
+        calls = mock_subprocess.run.call_args_list
+        assert len(calls) == 2
+        git_add_call = calls[0]
+        assert git_add_call.args[0] == ["git", "add", "-A"]
+        assert git_add_call.kwargs["cwd"] == str(worktree)
+        assert git_add_call.kwargs["check"] is True
+        git_commit_call = calls[1]
+        assert git_commit_call.args[0] == [
+            "git",
+            "commit",
+            "-m",
+            "feat: task-commit-success implementation",
+        ]
+        assert git_commit_call.kwargs["cwd"] == str(worktree)
+
+
+def test_developer_does_not_commit_on_failure(mock_doer, mock_advisor, agent_loader, agents_config):
+    """Developer does not run git add/commit when ralph_loop returns success=False."""
+    mock_doer.return_value.ralph_loop.return_value = RalphResult(
+        success=False, iterations=10, output="Still broken."
+    )
+    with patch("orchestrator.nodes.developer.subprocess") as mock_subprocess:
+        node_fn = make_developer_node(
+            repo_path="/tmp/repo",
+            branch_prefix="scaffold",
+            agent_loader=agent_loader,
+            agents_config=agents_config,
+        )
+        state = initial_state(task_id="task-commit-failure", level="task")
+        state["specialists"] = ["python-expert"]
+        state["agent_output"] = "Update main.py"
+
+        result = node_fn(state)
+
+        assert result["status"] == "stuck"
+        mock_subprocess.run.assert_not_called()
 
 
 def test_extract_file_paths():
