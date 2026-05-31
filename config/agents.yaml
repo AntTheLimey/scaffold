@@ -26,25 +26,25 @@ specialists:
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
-    timeout: 900
+    timeout: 1800
   go-expert:
     model: claude-sonnet-4-6
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
-    timeout: 900
+    timeout: 1800
   react-expert:
     model: claude-sonnet-4-6
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
-    timeout: 900
+    timeout: 1800
   typescript-expert:
     model: claude-sonnet-4-6
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
-    timeout: 900
+    timeout: 1800
   postgres-expert:
     model: claude-opus-4-6
     execution: api
