@@ -22,7 +22,12 @@ Project-agnostic — configured via YAML to target any repository.
   - **config.py** — YAML config loading (governance, agents, project)
   - **task_tree.py** — task CRUD with status transitions and dependency queries
   - **telemetry.py** — event logging and agent run tracking
-- **config/** — YAML configuration (governance.yaml, agents.yaml, project.yaml)
+  - **budget.py** — model pricing table and token-to-dollar cost calculation
+  - **dispatcher.py** — task dispatch with topological sort for depends_on ordering
+  - **event_bus.py** — SQLite-backed event bus for observability (node enter/exit, API/CLI calls, costs, tool calls)
+  - **json_utils.py** — JSON extraction from mixed text (agent output parsing)
+  - **tools.py** — read-only codebase tools (read_file, list_directory, grep) for AdvisorAgent tool use
+- **config/** — YAML configuration (governance.yaml, agents.yaml, projects/)
 - **db/** — SQLite schema (schema.sql)
 - **tests/** — pytest test suite
 
@@ -30,7 +35,7 @@ Project-agnostic — configured via YAML to target any repository.
 
 Two tiers of agents, all sharing the same structure (agent.md + knowledge-base/):
 
-**Workflow agents** own phases of the orchestration pipeline. They use the Anthropic API (AdvisorAgent). They carry methodology knowledge bases. They do not write code.
+**Workflow agents** own phases of the orchestration pipeline. They use the Anthropic API (AdvisorAgent). They carry methodology knowledge bases. They do not write code. PO, architect, and designer have read-only codebase tools (read_file, list_directory, grep) for inspecting the target repo before making decisions.
 
 **Specialist agents** own implementation domains. Implementation specialists are spawned via `claude` CLI in git worktrees (DoerAgent). Advisory specialists (postgres-expert, security-auditor) provide recommendations via the Anthropic API without writing code.
 
@@ -49,7 +54,7 @@ The AgentLoader handles this assembly.
 START → onboarding → intake_router → product_owner → architect → [designer] → developer → reviewer → qa → END
 ```
 
-The onboarding node detects project context and configures the specialist roster. The developer node dispatches to the appropriate specialist based on file types.
+The onboarding node detects project context and configures the specialist roster. The developer node selects the appropriate specialist using a cascading priority: architect-declared specialist → architect file paths → regex file extraction → onboarding roster → detected languages → python-expert fallback.
 
 ## Development
 
@@ -71,6 +76,7 @@ make typecheck    # Run pyright
 make check        # lint + typecheck + test
 scaffold preflight --config config/   # Validate environment
 scaffold init /path/to/repo --config config/   # Initialize a target repo
+scaffold clean --repo /path --db scaffold.db  # Remove worktrees, branches, and DB from a previous run
 ```
 
 ### Testing
@@ -96,11 +102,11 @@ scaffold init /path/to/repo --config config/   # Initialize a target repo
 
 Top-level keys: `workflow` (pipeline agents), `specialists` (domain agents), `escalation` (thresholds).
 
-Each agent entry has: `model`, `execution` (api or cli), and optionally `max_iterations` and `completion_promise` for CLI agents.
+Each agent entry has: `model`, `execution` (api or cli), and optionally `max_iterations`, `completion_promise`, `timeout`, and `max_budget_usd` for CLI agents.
 
 ### project.yaml
 
-Per-project config in `config/projects/{name}.yaml`. Keys: `repo_path`, `branch_prefix`, `max_concurrent_agents`, `db_path`.
+Per-project config in `config/projects/{name}.yaml`. Keys: `repo_path`, `branch_prefix`, `max_concurrent_agents`, `db_path`, `max_budget_usd`.
 
 Legacy: a single `config/project.yaml` is supported for backward compatibility when `--project` is not provided.
 

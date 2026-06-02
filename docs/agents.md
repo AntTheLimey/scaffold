@@ -107,13 +107,13 @@ Specialist agents own implementation domains. They divide into two subtypes base
 
 **Implementation specialists** write code via the `claude` CLI in git worktrees (DoerAgent class). They iterate until they emit their completion promise or exhaust their iteration budget.
 
-| Specialist | File Types | Max Iterations | Completion Promise |
-|------------|-----------|----------------|--------------------|
-| python-expert | `.py` | 10 | `TASK COMPLETE` |
-| go-expert | `.go` | 10 | `TASK COMPLETE` |
-| react-expert | `.tsx`, `.jsx` | 10 | `TASK COMPLETE` |
-| typescript-expert | `.ts`, `.js` | 10 | `TASK COMPLETE` |
-| documentation-writer | `.md` | 5 | `TASK COMPLETE` |
+| Specialist | File Types | Max Iterations | Completion Promise | Timeout | Budget Cap |
+|------------|-----------|----------------|--------------------|---------|-----------:|
+| python-expert | `.py` | 10 | `TASK COMPLETE` | 1800s | $2.00 |
+| go-expert | `.go` | 10 | `TASK COMPLETE` | 1800s | $2.00 |
+| react-expert | `.tsx`, `.jsx` | 10 | `TASK COMPLETE` | 1800s | $2.00 |
+| typescript-expert | `.ts`, `.js` | 10 | `TASK COMPLETE` | 1800s | $2.00 |
+| documentation-writer | `.md` | 5 | `TASK COMPLETE` | — | $2.00 |
 
 **Advisory specialists** provide recommendations via the API (AdvisorAgent class) without writing code. They are dispatched in parallel before the implementation specialist runs, and their output is appended to the specialist's assembled prompt.
 
@@ -178,11 +178,12 @@ The mapping is defined in `EXTENSION_TO_SPECIALIST` in `orchestrator/agent_loade
 
 ### Selection Priority
 
-1. Extract file paths from the architect's output using regex.
-2. Count extensions and identify the most-common specialist via `detect_specialist`.
-3. If the detected specialist is in the onboarding roster, use it.
-4. If not detected, or the detected specialist is not in the roster, use the first specialist from the roster.
-5. Fallback: `python-expert`.
+1. Check architect's explicit specialist recommendation (`architect_specialist` field from architect output).
+2. Detect specialist from architect's declared file paths (`architect_file_paths`).
+3. Detect specialist from regex-extracted file paths in agent_output.
+4. Fall back to first specialist in the onboarding roster.
+5. Fall back to language-detected specialist via `LANGUAGE_TO_SPECIALIST` mapping (also defined in `developer.py`).
+6. Final fallback: `python-expert`.
 
 Advisory specialists from the onboarding roster are dispatched in parallel before the implementation specialist runs.
 
@@ -241,8 +242,8 @@ React is detected by scanning `package.json` dependencies for names that match o
 
 Defined in `orchestrator/nodes/base.py`.
 
-- Makes a single API call with a system prompt and a user message.
-- Returns `AgentResult(text, token_in, token_out)`.
+- Supports single-call and multi-turn tool-use modes. In tool-use mode, iterates up to 25 turns with read-only codebase tools (`read_file`, `list_directory`, `grep`).
+- Returns `AgentResult(text, token_in, token_out, cost_usd)`.
 - Supports optional system prompt caching (`cache_control: ephemeral`) for repeated calls with the same system prompt.
 - Used by: product_owner, architect, designer, consensus (workflow); postgres-expert, security-auditor (advisory specialists).
 
@@ -252,7 +253,7 @@ Defined in `orchestrator/nodes/base.py`.
 
 - Creates a git worktree for isolation (`git worktree add -b {branch}`). The worktree is placed at `{repo_parent}/.worktrees/{branch-slug}`.
 - Runs the `claude` CLI iteratively (`ralph_loop`) up to `max_iterations` times (default: 10).
-- Each iteration invokes: `claude --model {model} -p {prompt}` with a 600-second timeout.
+- Each iteration invokes: `claude --model {model} --output-format stream-json --max-budget-usd {n} -p {prompt}` with a configurable timeout (default 1800s for implementation specialists).
 - On iteration 2+, the previous attempt's output is appended to the prompt with a retry instruction.
 - Declares success when `completion_promise` appears in stdout.
 - Returns `RalphResult(success, iterations, output)`.
@@ -291,7 +292,7 @@ The qa agent uses `completion_promise = "TESTS PASSING"` and `max_iterations = 8
    ```
 
 5. If the specialist should be auto-detected from file extensions, add the mapping to `EXTENSION_TO_SPECIALIST` in `orchestrator/agent_loader.py`.
-6. If the specialist should be included in the onboarding roster based on language, update `LANGUAGE_TO_SPECIALIST` in `orchestrator/nodes/onboarding.py`.
+6. If the specialist should be included in the onboarding roster based on language, update `LANGUAGE_TO_SPECIALIST` in both `orchestrator/nodes/onboarding.py` and `orchestrator/nodes/developer.py`.
 7. If it's an advisory specialist with a new trigger condition, add detection logic to `make_onboarding_node` in `orchestrator/nodes/onboarding.py`.
 
 ### Project-Specific Overrides
@@ -327,7 +328,7 @@ Agent configuration lives in `config/agents.yaml`. Top-level keys:
 |-----|---------|
 | `workflow` | One entry per workflow agent with `model` and `execution` |
 | `specialists` | One entry per specialist with `model`, `execution`, and optionally `max_iterations`, `completion_promise` |
-| `escalation` | Thresholds: `max_review_cycles`, `max_bug_cycles`, `cost_threshold_per_run`, `stuck_loop_model` |
+| `escalation` | Thresholds: `max_review_cycles`, `max_bug_cycles`, `stuck_loop_model` |
 
 Each agent entry:
 
@@ -337,3 +338,5 @@ Each agent entry:
 | `execution` | `api` or `cli` | Determines AdvisorAgent vs DoerAgent |
 | `max_iterations` | integer | CLI agents only; max ralph_loop iterations |
 | `completion_promise` | string | CLI agents only; substring that signals task completion |
+| `timeout` | integer | CLI agents only; seconds before the subprocess is killed (default 600, specialists use 1800) |
+| `max_budget_usd` | float | CLI agents only; per-iteration cost cap in USD passed to `--max-budget-usd` |
