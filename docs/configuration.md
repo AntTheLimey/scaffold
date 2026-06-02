@@ -149,6 +149,8 @@ Defines all agents used by the orchestrator. Three top-level sections: `workflow
 | `execution` | string | Yes | `api` for direct API calls; `cli` for the `claude` CLI in a git worktree |
 | `max_iterations` | int | CLI only | Maximum iterations before the loop is considered stuck |
 | `completion_promise` | string | CLI only | Exact string the agent must output to signal successful completion |
+| `timeout` | int | CLI only | Seconds before subprocess is killed (default 600; implementation specialists use 1800) |
+| `max_budget_usd` | float | CLI only | Per-iteration cost cap in USD; passed as `--max-budget-usd` to the `claude` CLI |
 
 ### workflow
 
@@ -220,21 +222,29 @@ specialists:
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
+    timeout: 1800
+    max_budget_usd: 2.00
   go-expert:
     model: claude-sonnet-4-6
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
+    timeout: 1800
+    max_budget_usd: 2.00
   react-expert:
     model: claude-sonnet-4-6
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
+    timeout: 1800
+    max_budget_usd: 2.00
   typescript-expert:
     model: claude-sonnet-4-6
     execution: cli
     max_iterations: 10
     completion_promise: "TASK COMPLETE"
+    timeout: 1800
+    max_budget_usd: 2.00
   postgres-expert:
     model: claude-opus-4-6
     execution: api
@@ -243,6 +253,7 @@ specialists:
     execution: cli
     max_iterations: 5
     completion_promise: "TASK COMPLETE"
+    max_budget_usd: 2.00
   security-auditor:
     model: claude-opus-4-6
     execution: api
@@ -257,7 +268,6 @@ Thresholds that trigger automatic human escalation via Telegram (or a logged war
 | `stuck_loop_model` | string | — | Model used to analyse a stuck loop before escalating |
 | `max_review_cycles` | int | 3 | Number of reviewer rejections before escalating to human |
 | `max_bug_cycles` | int | 3 | Number of QA failures before escalating to human |
-| `cost_threshold_per_run` | float | — | Maximum USD cost per run; escalates if exceeded |
 
 **Example:**
 
@@ -266,7 +276,6 @@ escalation:
   stuck_loop_model: claude-opus-4-6
   max_review_cycles: 3
   max_bug_cycles: 3
-  cost_threshold_per_run: 5.00
 ```
 
 ---
@@ -285,6 +294,7 @@ Created by `scaffold init /path/to/repo --config config/ --project {name}`. Sele
 | `branch_prefix` | string | `scaffold` | Prefix applied to all worktree branch names |
 | `max_concurrent_agents` | int | `3` | Maximum number of specialist agents running in parallel |
 | `db_path` | string | `scaffold_{name}.db` | Path to the SQLite database for this project |
+| `max_budget_usd` | float | `None` (no limit) | Maximum total cost in USD for the entire scaffold run; enforced by the event bus after each agent call |
 
 **Example (`config/projects/webapp.yaml`):**
 
@@ -293,6 +303,7 @@ repo_path: /Users/you/projects/webapp
 branch_prefix: scaffold
 max_concurrent_agents: 3
 db_path: scaffold_webapp.db
+max_budget_usd: 25.00
 ```
 
 ### Legacy: `config/project.yaml`

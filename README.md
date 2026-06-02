@@ -15,7 +15,10 @@ Agents are organized into two tiers: **workflow agents** own pipeline phases and
 - **Resumable execution** -- LangGraph checkpointing with SQLite persistence
 - **Self-healing** -- stuck-loop and cascading-failure detection with automatic escalation
 - **Multi-project support** -- run against multiple repositories from one scaffold install
+- **Budget controls** -- per-iteration and per-run cost limits with automatic enforcement
+- **Codebase-aware advisors** -- workflow agents inspect the target repo before making decisions
 - **`scaffold init`** -- interactive project setup with language/framework auto-detection
+- **`scaffold clean`** -- remove worktrees, branches, and DB records from a previous run
 
 ## Architecture
 
@@ -104,9 +107,10 @@ scaffold run --spec spec.md --config config/ --project myapp
 | `scaffold decide` | Provide a human decision for a paused task |
 | `scaffold init` | Initialize a target repo with auto-detection |
 | `scaffold preflight` | Validate prerequisites and environment |
-| `scaffold report` | Show metrics (costs, cycles, agent efficiency) |
+| `scaffold report` | Show metrics (costs, cycles, agent efficiency, tool usage) |
 | `scaffold events` | Show event log for a specific task |
 | `scaffold pause` | Pause execution |
+| `scaffold clean` | Remove worktrees, branches, and DB from a previous run |
 
 Run any command with `--help` for full option details.
 
@@ -131,17 +135,22 @@ orchestrator/               Main package
     specialists/            Domain implementation agents (python-expert, ...)
   nodes/                    Graph node implementations (one per pipeline phase)
   agent_loader.py           Prompt assembly from agent.md + knowledge bases
-  graph.py                  LangGraph StateGraph wiring and routing
-  state.py                  TaskState TypedDict shared across all nodes
+  budget.py                 Model pricing and token-to-dollar cost calculation
   config.py                 YAML config loading
+  db.py                     SQLite connection management
+  dispatcher.py             Task dispatch with topological sort (depends_on)
+  event_bus.py              SQLite-backed event bus for observability
+  graph.py                  LangGraph StateGraph wiring and routing
+  init.py                   Project initialization and detection
+  json_utils.py             JSON extraction from mixed text
+  preflight.py              Environment validation
   router.py                 RAPID/RACI governance routing
   self_heal.py              Stuck-loop and failure detection
+  state.py                  TaskState TypedDict shared across all nodes
   task_tree.py              Task CRUD with status transitions
   telegram.py               Telegram Bot API integration
   telemetry.py              Event logging and agent run tracking
-  db.py                     SQLite connection management
-  preflight.py              Environment validation
-  init.py                   Project initialization and detection
+  tools.py                  Read-only codebase tools for AdvisorAgent
 config/                     YAML configuration files
 db/                         SQLite schema (schema.sql)
 tests/                      pytest test suite (one file per module)

@@ -20,6 +20,7 @@ Installed via `pip install -e .`. Entry point: `orchestrator.__main__:main`.
 - [report](#report) — Show metrics and status
 - [events](#events) — Show the event log for a task
 - [pause](#pause) — Pause scaffold work
+- [clean](#clean) — Remove worktrees, branches, and database from a previous run
 
 ---
 
@@ -225,6 +226,7 @@ scaffold report [--db <path>] [--costs] [--cycles] [--agents]
 | `--costs` | No | — | Show cost breakdown by epic (tokens, run count) |
 | `--cycles` | No | — | Show cycle hotspots (tasks with excessive revisions) |
 | `--agents` | No | — | Show agent efficiency (success rate, average iterations) |
+| `--tools` | No | — | Show tool usage breakdown by agent |
 
 When called with no flags, outputs the overall task completion count.
 
@@ -284,6 +286,40 @@ scaffold pause [--db <path>]
 
 ```
 scaffold pause --db scaffold_webapp.db
+```
+
+---
+
+## clean
+
+Remove scaffold worktrees, branches, and database files from a previous run.
+
+```
+scaffold clean --repo <path> [--db <path>] [--yes]
+```
+
+### Options
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `--repo` | Yes | — | Path to the target repository |
+| `--db` | No | `scaffold.db` | Path to the scaffold database file to remove |
+| `--yes` | No | — | Skip confirmation prompt |
+
+### Behavior
+
+1. Lists all scaffold-related git worktrees in the target repo
+2. Lists all `scaffold/*` branches
+3. Identifies the database file and its WAL/SHM sidecars, plus the checkpoint database
+4. Displays a summary of what will be removed
+5. Prompts for confirmation (unless `--yes` is passed)
+6. Removes worktrees, deletes branches, and removes database files
+
+### Example
+
+```
+scaffold clean --repo /path/to/my-repo --db scaffold_webapp.db
+scaffold clean --repo /path/to/my-repo --yes
 ```
 
 ---

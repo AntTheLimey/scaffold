@@ -68,14 +68,15 @@ Produces UI/UX specifications for features that have a UI component. Does not wr
 
 The specialist dispatcher and the most complex node:
 
-1. Extracts file paths from the technical design.
-2. Detects which implementation specialist matches those file types (e.g. `.py` → `python-expert`, `.tsx` → `react-expert`).
+1. Reads the architect's output for an explicit specialist recommendation and file paths.
+2. Selects specialist using cascading priority: architect-declared specialist → architect file paths (extension detection) → regex-extracted file paths → onboarding roster → detected languages → python-expert fallback.
 3. Dispatches advisory specialists (`postgres-expert`, `security-auditor`) for recommendations.
 4. Assembles the specialist prompt via `AgentLoader`.
 5. Creates a git worktree for isolated work.
 6. Runs the `ralph_loop` (iterative implementation with completion detection).
-7. Cleans up the worktree.
-8. Returns `in_review` on success or `stuck` on failure.
+7. Commits successful work (`git add -A` + `git commit`).
+8. Cleans up the worktree.
+9. Returns `in_review` on success or `stuck` on failure.
 
 ### reviewer
 
@@ -129,7 +130,25 @@ The `ralph_loop` is the iterative execution model for CLI-based agents:
 4. If not found and iterations remain → append previous output with a retry instruction and loop.
 5. If `max_iterations` exceeded → return failure (`stuck`).
 
-Each iteration has a 600-second timeout.
+Each iteration has a configurable timeout (default 1800s for implementation specialists). Per-iteration cost is capped by `max_budget_usd` (default $2 for CLI specialists).
+
+### AdvisorAgent
+
+Wraps direct Anthropic API calls for workflow agents and advisory specialists. Supports single-call and multi-turn tool-use modes. In tool-use mode, the agent iterates up to 25 turns with read-only codebase tools (`read_file`, `list_directory`, `grep`).
+
+Returns `AgentResult(text, token_in, token_out, cost_usd)`.
+
+**Used by:** all workflow agents (product_owner, architect, designer, reviewer, qa, consensus) and advisory specialists (postgres-expert, security-auditor). PO, architect, and designer are wired with repo-scoped codebase tools for inspecting the target repository before making decisions.
+
+### DoerAgent
+
+Wraps the `claude` CLI for implementation specialists running inside git worktrees.
+
+Each iteration invokes: `claude --model {model} --max-budget-usd {cap} --output-format stream-json --verbose -p {prompt}` with a configurable timeout (default 1800 seconds for specialists).
+
+When an iteration times out, the `ralph_loop` catches `TimeoutExpired`, parses partial stdout for streamed token usage from `assistant` messages, and recovers the cost via `cost_for_tokens`. This prevents timed-out iterations from being recorded as $0.
+
+Returns `RalphResult(success, iterations, output)`.
 
 ### Git Worktree Isolation
 
@@ -158,6 +177,8 @@ Shared state passed across all nodes. Key fields:
 | `review_cycles`, `bug_cycles` | Loop counters |
 | `escalation_reason`, `has_ui_component` | Routing flags |
 | `child_tasks` | Subtasks produced by product_owner or architect |
+| `architect_file_paths` | File paths declared by the architect for specialist detection |
+| `architect_specialist` | Specialist name explicitly recommended by the architect |
 
 ### Checkpointing
 
