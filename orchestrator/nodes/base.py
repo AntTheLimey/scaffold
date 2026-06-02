@@ -15,6 +15,8 @@ class CliOutput:
     result_text: str
     tool_names: list[str]
     cost_usd: float | None
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
 
 
 def parse_cli_output(stdout: str) -> CliOutput:
@@ -22,6 +24,8 @@ def parse_cli_output(stdout: str) -> CliOutput:
     result_text: str | None = None
     cost_usd: float | None = None
     found_jsonl = False
+    total_input_tokens = 0
+    total_output_tokens = 0
     for line in stdout.splitlines():
         line = line.strip()
         if not line:
@@ -36,6 +40,10 @@ def parse_cli_output(stdout: str) -> CliOutput:
             message = obj.get("message")
             if not isinstance(message, dict):
                 continue
+            usage = message.get("usage")
+            if isinstance(usage, dict):
+                total_input_tokens += usage.get("input_tokens", 0)
+                total_output_tokens += usage.get("output_tokens", 0)
             content = message.get("content")
             if not isinstance(content, list):
                 continue
@@ -50,8 +58,20 @@ def parse_cli_output(stdout: str) -> CliOutput:
             result_text = obj.get("result", "")
             cost_usd = obj.get("total_cost_usd")
     if not found_jsonl or result_text is None:
-        return CliOutput(result_text=stdout, tool_names=[], cost_usd=None)
-    return CliOutput(result_text=result_text, tool_names=tool_names, cost_usd=cost_usd)
+        return CliOutput(
+            result_text=stdout,
+            tool_names=[],
+            cost_usd=None,
+            total_input_tokens=total_input_tokens,
+            total_output_tokens=total_output_tokens,
+        )
+    return CliOutput(
+        result_text=result_text,
+        tool_names=tool_names,
+        cost_usd=cost_usd,
+        total_input_tokens=total_input_tokens,
+        total_output_tokens=total_output_tokens,
+    )
 
 
 @dataclass
@@ -287,10 +307,34 @@ class DoerAgent:
                     )
                 last_output = parsed.result_text
                 iteration_cost = parsed.cost_usd
+                if iteration_cost is None and parsed.total_input_tokens > 0:
+                    iteration_cost = cost_for_tokens(
+                        self.model, parsed.total_input_tokens, parsed.total_output_tokens
+                    )
                 success = self.completion_promise in parsed.result_text
                 if bus:
                     for tool_name in parsed.tool_names:
                         bus.tool_call(self.role, tool_name, task_id)
+            except subprocess.TimeoutExpired as exc:
+                partial_stdout = exc.stdout or ""
+                if isinstance(partial_stdout, bytes):
+                    partial_stdout = partial_stdout.decode("utf-8", errors="replace")
+                parsed = parse_cli_output(partial_stdout)
+                if parsed.cost_usd is not None:
+                    iteration_cost = parsed.cost_usd
+                elif parsed.total_input_tokens > 0:
+                    iteration_cost = cost_for_tokens(
+                        self.model, parsed.total_input_tokens, parsed.total_output_tokens
+                    )
+                last_output = parsed.result_text if parsed.result_text != partial_stdout else ""
+                if bus:
+                    for tool_name in parsed.tool_names:
+                        bus.tool_call(self.role, tool_name, task_id)
+                click.echo(
+                    f"[{self.role}] iteration {i} timed out after {self.timeout}s"
+                    f" (recovered cost: ${iteration_cost or 0:.2f})",
+                    err=True,
+                )
             finally:
                 if bus:
                     bus.cli_done(

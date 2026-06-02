@@ -19,6 +19,8 @@ class TaskState(TypedDict):
     project_context: str
     detected_languages: list[str]
     test_framework: str
+    architect_file_paths: list[str]
+    architect_specialist: str
 
 
 def initial_state(task_id: str, level: str) -> TaskState:
@@ -40,4 +42,6 @@ def initial_state(task_id: str, level: str) -> TaskState:
         project_context="",
         detected_languages=[],
         test_framework="",
+        architect_file_paths=[],
+        architect_specialist="",
     )

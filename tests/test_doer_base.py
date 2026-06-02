@@ -315,3 +315,58 @@ def test_doer_no_budget_check_when_scaffold_budget_none(mock_run):
         mock_run.return_value = MagicMock(stdout="Done.\nTASK COMPLETE", stderr="", returncode=0)
         doer.ralph_loop(worktree_path="/tmp/wt", prompt="Do it", task_id="t-1")
     mock_bus.check_budget.assert_not_called()
+
+
+_USAGE_MSG_1 = (
+    '{"type":"assistant","message":{"usage":{"input_tokens":1000,"output_tokens":200},'
+    '"content":[{"type":"tool_use","name":"Read","id":"t1","input":{}}]}}'
+)
+_USAGE_MSG_2 = (
+    '{"type":"assistant","message":{"usage":{"input_tokens":1500,"output_tokens":300},'
+    '"content":[{"type":"tool_use","name":"Edit","id":"t2","input":{}}]}}'
+)
+_USAGE_RESULT = (
+    '{"type":"result","result":"Done.\\nTASK COMPLETE","num_turns":2,"total_cost_usd":0.08}'
+)
+STREAM_WITH_USAGE = "\n".join([_USAGE_MSG_1, _USAGE_MSG_2, _USAGE_RESULT])
+
+
+def test_parse_cli_output_accumulates_usage_tokens():
+    output = parse_cli_output(STREAM_WITH_USAGE)
+    assert output.total_input_tokens == 2500
+    assert output.total_output_tokens == 500
+
+
+def test_parse_cli_output_without_result_line():
+    # Simulates a timeout: assistant messages with usage but no result line
+    partial = "\n".join([_USAGE_MSG_1, _USAGE_MSG_2])
+    output = parse_cli_output(partial)
+    assert output.total_input_tokens == 2500
+    assert output.total_output_tokens == 500
+    assert output.cost_usd is None
+
+
+@patch("orchestrator.nodes.base.subprocess.run")
+def test_ralph_loop_timeout_recovers_cost(mock_run):
+    doer = DoerAgent(
+        role="developer",
+        model="claude-sonnet-4-6",
+        max_iterations=3,
+        completion_promise="TASK COMPLETE",
+        timeout=60,
+    )
+    partial_stdout = "\n".join([_USAGE_MSG_1, _USAGE_MSG_2])
+    exc = subprocess.TimeoutExpired(cmd=["claude"], timeout=60, output=partial_stdout)
+    mock_run.side_effect = exc
+
+    mock_bus = MagicMock()
+    with patch("orchestrator.nodes.base.get_bus", return_value=mock_bus):
+        result = doer.ralph_loop(worktree_path="/tmp/wt", prompt="Do it", task_id="t-1")
+
+    assert result.success is False
+    cli_done_calls = [c for c in mock_bus.method_calls if c[0] == "cli_done"]
+    assert len(cli_done_calls) == 3  # max_iterations exhausted
+    # Every cli_done call should have a non-None cost recovered from streamed usage
+    for call in cli_done_calls:
+        assert call.kwargs.get("cost_usd") is not None
+        assert call.kwargs.get("cost_usd") > 0

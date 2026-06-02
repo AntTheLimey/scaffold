@@ -73,6 +73,8 @@ def make_architect_node(
             "child_tasks": parsed.get("children", []),
             "status": "decomposing",
             "agent_output": result.text,
+            "architect_file_paths": parsed.get("file_paths", []),
+            "architect_specialist": parsed.get("specialist", ""),
         }
         if bus:
             bus.node_exit(

@@ -42,18 +42,35 @@ def make_developer_node(
         # 2. Extract file paths from agent_output
         file_paths = _extract_file_paths(agent_output)
 
-        # 3. Select specialist — match file types against roster
+        # 3. Select specialist — cascading priority
         specialist_name = ""
-        detected = agent_loader.detect_specialist(file_paths) if file_paths else ""
-        if detected and (
-            (specialist_names and detected in specialist_names)
-            or (
-                not specialist_names
-                and detected != "documentation-writer"
-                and detected in agents_config.specialists
-            )
-        ):
-            specialist_name = detected
+
+        # 3a. Check architect's explicit specialist recommendation
+        architect_specialist = state.get("architect_specialist", "")
+        if architect_specialist and architect_specialist in agents_config.specialists:
+            specialist_name = architect_specialist
+
+        # 3b. Try architect's file_paths (more reliable than regex extraction)
+        if not specialist_name:
+            arch_paths = state.get("architect_file_paths", [])
+            if arch_paths:
+                detected = agent_loader.detect_specialist(arch_paths)
+                if detected and detected in agents_config.specialists:
+                    specialist_name = detected
+
+        # 3c. Fall back to regex-extracted paths from agent_output
+        if not specialist_name:
+            detected = agent_loader.detect_specialist(file_paths) if file_paths else ""
+            if detected and (
+                (specialist_names and detected in specialist_names)
+                or (
+                    not specialist_names
+                    and detected != "documentation-writer"
+                    and detected in agents_config.specialists
+                )
+            ):
+                specialist_name = detected
+
         if not specialist_name and specialist_names:
             specialist_name = specialist_names[0]
         if not specialist_name:

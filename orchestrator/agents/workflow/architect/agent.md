@@ -62,6 +62,7 @@ large for a single development session.
 {
   "technical_design": "string — prose description of the architecture",
   "has_ui_component": true,
+  "specialist": "string — recommended specialist name (go-expert, react-expert, etc.); omit if uncertain",
   "file_paths": [
     "string — exact path for each new or modified file"
   ],

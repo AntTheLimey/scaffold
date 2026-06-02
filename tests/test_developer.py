@@ -31,6 +31,12 @@ def agents_config():
             "max_iterations": 5,
             "completion_promise": "TASK COMPLETE",
         },
+        "go-expert": {
+            "model": "claude-sonnet-4-6",
+            "execution": "cli",
+            "max_iterations": 10,
+            "completion_promise": "TASK COMPLETE",
+        },
     }
     return config
 
@@ -594,3 +600,99 @@ def test_extract_file_paths():
     assert "tests/test_developer.py" in paths
     assert "config/agents.yaml" in paths
     assert "src/components/App.tsx" in paths
+
+
+def test_developer_uses_architect_specialist(mock_doer, mock_advisor, agent_loader, agents_config):
+    """Developer uses architect_specialist from state, overriding file-based detection."""
+    agent_loader.detect_specialist.return_value = "python-expert"
+
+    node_fn = make_developer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        agent_loader=agent_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-arch-spec", level="task")
+    state["specialists"] = []
+    state["agent_output"] = "Design SQL schema and migrations"
+    state["architect_specialist"] = "go-expert"
+
+    node_fn(state)
+
+    mock_doer.assert_called_once_with(
+        role="go-expert",
+        model="claude-sonnet-4-6",
+        max_iterations=10,
+        completion_promise="TASK COMPLETE",
+        max_budget_usd=None,
+        timeout=600,
+    )
+
+
+def test_developer_uses_architect_file_paths(mock_doer, mock_advisor, agent_loader, agents_config):
+    """Developer uses architect_file_paths when architect_specialist is unset."""
+
+    def detect_side_effect(paths):
+        if any(p.endswith(".go") for p in paths):
+            return "go-expert"
+        return "python-expert"
+
+    agent_loader.detect_specialist.side_effect = detect_side_effect
+
+    node_fn = make_developer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        agent_loader=agent_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-arch-paths", level="task")
+    state["specialists"] = []
+    state["agent_output"] = "Implement auth service"
+    state["architect_file_paths"] = [
+        "internal/auth/handler.go",
+        "internal/auth/handler_test.go",
+    ]
+
+    node_fn(state)
+
+    mock_doer.assert_called_once_with(
+        role="go-expert",
+        model="claude-sonnet-4-6",
+        max_iterations=10,
+        completion_promise="TASK COMPLETE",
+        max_budget_usd=None,
+        timeout=600,
+    )
+
+
+def test_developer_architect_specialist_overrides_file_detection(
+    mock_doer, mock_advisor, agent_loader, agents_config
+):
+    """architect_specialist wins even when file paths suggest a different specialist."""
+    agent_loader.detect_specialist.return_value = "go-expert"
+
+    node_fn = make_developer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        agent_loader=agent_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-arch-override", level="task")
+    state["specialists"] = []
+    state["agent_output"] = "Update internal/auth/handler.go and internal/auth/service.go"
+    state["architect_file_paths"] = [
+        "internal/auth/handler.go",
+        "internal/auth/service.go",
+    ]
+    state["architect_specialist"] = "react-expert"
+
+    node_fn(state)
+
+    mock_doer.assert_called_once_with(
+        role="react-expert",
+        model="claude-sonnet-4-6",
+        max_iterations=8,
+        completion_promise="TASK COMPLETE",
+        max_budget_usd=None,
+        timeout=600,
+    )
