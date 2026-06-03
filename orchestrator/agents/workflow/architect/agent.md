@@ -58,11 +58,19 @@ large for a single development session.
 
 ## Output Format
 
+The `technical_design` value must be plain prose — no markdown code fences, no
+triple backticks. Use inline code with single backticks if needed.
+
+The `specialist` field is required. Choose the implementation specialist whose
+domain best matches the task: `python-expert`, `go-expert`, `react-expert`,
+`typescript-expert`, or `documentation-writer`. Base this on the language of the
+files being created or modified, not on advisory concerns.
+
 ```json
 {
-  "technical_design": "string — prose description of the architecture",
+  "technical_design": "string — prose description of the architecture (no code fences)",
   "has_ui_component": true,
-  "specialist": "string — recommended specialist name (go-expert, react-expert, etc.); omit if uncertain",
+  "specialist": "string — required: go-expert, python-expert, react-expert, typescript-expert, or documentation-writer",
   "file_paths": [
     "string — exact path for each new or modified file"
   ],
@@ -87,6 +95,7 @@ Input: Feature "Add user profile endpoint"
 {
   "technical_design": "New REST endpoint GET /api/users/{id}/profile returns user profile data. Profile model extends User with bio, avatar_url, and preferences JSON field. Repository pattern: ProfileRepository handles persistence, ProfileService handles business rules. No new dependencies required.",
   "has_ui_component": false,
+  "specialist": "python-expert",
   "file_paths": [
     "src/models/profile.py",
     "src/repositories/profile_repository.py",

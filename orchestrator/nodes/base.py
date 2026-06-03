@@ -114,7 +114,7 @@ class AdvisorAgent:
         if tools is None:
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=4096,
+                max_tokens=16384,
                 system=system,
                 messages=messages,
             )
@@ -135,7 +135,7 @@ class AdvisorAgent:
         for _turn in range(max_turns):
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=4096,
+                max_tokens=16384,
                 system=system,
                 messages=messages,
                 tools=tools,

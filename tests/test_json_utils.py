@@ -35,3 +35,15 @@ def test_handles_nested_braces():
     raw = '{"children": [{"acceptance": ["test {edge} case"]}]}'
     result = extract_json(raw)
     assert result["children"][0]["acceptance"] == ["test {edge} case"]
+
+
+def test_parses_json_with_embedded_code_fences():
+    raw = (
+        "Here is the design:\n\n```json\n"
+        '{"technical_design": "Use REST.\\n```\\npython -m run\\n```\\nThat is the command.",'
+        ' "specialist": "python-expert", "file_paths": ["src/main.py"],'
+        ' "has_ui_component": false, "children": []}\n```'
+    )
+    result = extract_json(raw)
+    assert result["specialist"] == "python-expert"
+    assert result["file_paths"] == ["src/main.py"]

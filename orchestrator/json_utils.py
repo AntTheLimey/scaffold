@@ -15,6 +15,16 @@ def extract_json(text: str) -> dict:
         except json.JSONDecodeError:
             pass
 
+    brace_idx = text.find("{")
+    if brace_idx >= 0:
+        decoder = json.JSONDecoder()
+        try:
+            obj, _ = decoder.raw_decode(text, brace_idx)
+            if isinstance(obj, dict):
+                return obj
+        except json.JSONDecodeError:
+            pass
+
     brace_match = re.search(r"\{.*\}", text, re.DOTALL)
     if brace_match:
         try:
