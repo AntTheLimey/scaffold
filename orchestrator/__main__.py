@@ -319,7 +319,8 @@ def pause(db):
 @click.option("--db", default="scaffold.db", help="Path to scaffold database to remove")
 @click.option("--yes", is_flag=True, help="Skip confirmation prompt")
 def clean(repo, db, yes):
-    """Clean up worktrees and database from a previous run."""
+    """Clean up worktrees, database, and artifacts from a previous run."""
+    import shutil
     import subprocess as sp
 
     repo_path = Path(repo).resolve()
@@ -348,8 +349,9 @@ def clean(repo, db, yes):
 
     db_path = Path(db)
     checkpoint_path = Path(_checkpoint_path(db))
+    scaffold_dir = repo_path / ".scaffold"
 
-    if not worktree_lines and not branches and not db_path.exists():
+    if not worktree_lines and not branches and not db_path.exists() and not scaffold_dir.exists():
         click.echo("Nothing to clean.")
         return
 
@@ -362,6 +364,8 @@ def clean(repo, db, yes):
         click.echo(f"  database: {db}")
     if checkpoint_path.exists():
         click.echo(f"  checkpoints: {checkpoint_path}")
+    if scaffold_dir.exists():
+        click.echo(f"  artifacts: {scaffold_dir}")
 
     if not yes:
         click.confirm("Proceed?", abort=True)
@@ -391,6 +395,10 @@ def clean(repo, db, yes):
     if checkpoint_path.exists():
         checkpoint_path.unlink()
         click.echo(f"  removed checkpoints: {checkpoint_path}")
+
+    if scaffold_dir.exists():
+        shutil.rmtree(scaffold_dir)
+        click.echo(f"  removed artifacts: {scaffold_dir}")
 
     for suffix in ["-wal", "-shm"]:
         wal_path = Path(f"{db}{suffix}")
