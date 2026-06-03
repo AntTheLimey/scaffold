@@ -12,8 +12,10 @@ from orchestrator.state import initial_state
 def mock_client():
     client = MagicMock()
     response = MagicMock()
+    response.stop_reason = "end_turn"
     response.content = [
         MagicMock(
+            type="text",
             text=json.dumps(
                 {
                     "technical_design": "Use JWT with httpOnly cookies. chi middleware.",
@@ -27,7 +29,7 @@ def mock_client():
                         },
                     ],
                 }
-            )
+            ),
         )
     ]
     response.usage.input_tokens = 600
@@ -53,15 +55,17 @@ def test_architect_produces_design(mock_client, mock_agent_loader):
 
 def test_architect_detects_ui_component(mock_client, mock_agent_loader):
     response = MagicMock()
+    response.stop_reason = "end_turn"
     response.content = [
         MagicMock(
+            type="text",
             text=json.dumps(
                 {
                     "technical_design": "React component with clock SVG",
                     "has_ui_component": True,
                     "children": [],
                 }
-            )
+            ),
         )
     ]
     response.usage.input_tokens = 500
@@ -155,3 +159,28 @@ def test_architect_works_without_agent_output(mock_client, mock_agent_loader):
     user_msg = messages[0]["content"]
     assert "feat-001" in user_msg
     assert "feature" in user_msg
+
+
+def test_architect_writes_artifact(mock_client, mock_agent_loader, tmp_path):
+    node_fn = make_architect_node(mock_client, mock_agent_loader, repo_path=str(tmp_path))
+    state = initial_state(task_id="feat-001", level="feature")
+    node_fn(state)
+    artifact = tmp_path / ".scaffold" / "artifacts" / "feat-001" / "architect.md"
+    assert artifact.exists()
+    assert "technical_design" in artifact.read_text()
+
+
+def test_architect_reads_task_spec_artifact(mock_client, mock_agent_loader, tmp_path):
+    spec_dir = tmp_path / ".scaffold" / "artifacts" / "feat-001"
+    spec_dir.mkdir(parents=True)
+    (spec_dir / "task_spec.md").write_text("# Auth Module\n\nAcceptance criteria:\n- JWT validates")
+
+    node_fn = make_architect_node(mock_client, mock_agent_loader, repo_path=str(tmp_path))
+    state = initial_state(task_id="feat-001", level="feature")
+    node_fn(state)
+
+    call_args = mock_client.messages.create.call_args
+    messages = call_args.kwargs["messages"]
+    user_msg = messages[0]["content"]
+    assert "Auth Module" in user_msg
+    assert "JWT validates" in user_msg
