@@ -122,6 +122,14 @@ def make_developer_node(
             specialist_name, Path(repo_path), task_context, advisory_input
         )
 
+        prompt = (
+            "IMPORTANT: You are a code implementation agent. Focus exclusively on "
+            "writing code, tests, and configuration files. Do NOT use planning or "
+            "coordination tools (TaskCreate, TaskUpdate, Skill, Agent, "
+            "AskUserQuestion, ToolSearch). Use only: Bash, Read, Write, Edit, Glob, "
+            "Grep. Do NOT create plans or task lists — implement directly.\n\n" + prompt
+        )
+
         # 7. Append review feedback
         failure_context = ""
         if state.get("feedback"):

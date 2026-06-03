@@ -696,3 +696,26 @@ def test_developer_architect_specialist_overrides_file_detection(
         max_budget_usd=None,
         timeout=600,
     )
+
+
+def test_developer_prepends_focus_instructions(
+    mock_doer, mock_advisor, agent_loader, agents_config
+):
+    """Developer prompt starts with focus instructions to suppress meta-tools."""
+    node_fn = make_developer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        agent_loader=agent_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-focus", level="task")
+    state["agent_output"] = "Build auth middleware"
+
+    node_fn(state)
+
+    doer_instance = mock_doer.return_value
+    call_args = doer_instance.ralph_loop.call_args
+    prompt = call_args.kwargs["prompt"]
+    assert prompt.startswith("IMPORTANT: You are a code implementation agent.")
+    assert "TaskCreate" in prompt
+    assert "Do NOT use planning" in prompt

@@ -42,11 +42,14 @@ def make_architect_node(
         if project_context:
             system_prompt += f"\n\n--- Project Context ---\n{project_context}\n---"
 
+        agent_output = state.get("agent_output", "")
         user_message = (
             f"Design the technical approach for this feature.\n\n"
             f"Task: {state['task_id']}\n"
             f"Level: {state['level']}\n"
         )
+        if agent_output:
+            user_message += f"\n{agent_output}\n"
 
         if bus:
             bus.api_call_start(

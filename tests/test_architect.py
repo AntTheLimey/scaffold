@@ -132,3 +132,26 @@ def test_architect_passes_tools_to_advisor(mock_client, mock_agent_loader):
     assert "tools" in call_args.kwargs
     tool_names = {t["name"] for t in call_args.kwargs["tools"]}
     assert tool_names == {"read_file", "list_directory", "grep"}
+
+
+def test_architect_includes_agent_output_in_user_message(mock_client, mock_agent_loader):
+    node_fn = make_architect_node(mock_client, mock_agent_loader)
+    state = initial_state(task_id="feat-001", level="feature")
+    state["agent_output"] = "# Auth middleware\n\nSpec reference: Section 2.1\n"
+    node_fn(state)
+    call_args = mock_client.messages.create.call_args
+    messages = call_args.kwargs["messages"]
+    user_msg = messages[0]["content"]
+    assert "Auth middleware" in user_msg
+    assert "Section 2.1" in user_msg
+
+
+def test_architect_works_without_agent_output(mock_client, mock_agent_loader):
+    node_fn = make_architect_node(mock_client, mock_agent_loader)
+    state = initial_state(task_id="feat-001", level="feature")
+    node_fn(state)
+    call_args = mock_client.messages.create.call_args
+    messages = call_args.kwargs["messages"]
+    user_msg = messages[0]["content"]
+    assert "feat-001" in user_msg
+    assert "feature" in user_msg
