@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from orchestrator.budget import BudgetExceededError
-from orchestrator.nodes.base import AgentResult, RalphResult
+from orchestrator.nodes.base import AgentResult, DoerAgent, RalphResult
 from orchestrator.nodes.developer import _extract_file_paths, make_developer_node
 from orchestrator.state import initial_state
 
@@ -719,3 +719,98 @@ def test_developer_prepends_focus_instructions(
     assert prompt.startswith("IMPORTANT: You are a code implementation agent.")
     assert "TaskCreate" in prompt
     assert "Do NOT use planning" in prompt
+
+
+def test_developer_reads_artifact_files(tmp_path):
+    """Developer reads architect.md and task_spec.md artifacts when agent_output is empty."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    artifact_dir = repo / ".scaffold" / "artifacts" / "task-001"
+    artifact_dir.mkdir(parents=True)
+    (artifact_dir / "architect.md").write_text(
+        '{"technical_design": "REST API", "specialist": "python-expert", '
+        '"file_paths": ["src/api.py"], "children": []}'
+    )
+    (artifact_dir / "task_spec.md").write_text("# Build API\n\nAcceptance criteria:\n- Works")
+
+    mock_loader = MagicMock()
+    mock_loader.load_specialist.return_value = "implement this"
+    mock_loader.detect_specialist.return_value = "python-expert"
+    agents_config = MagicMock()
+    agents_config.specialists = {
+        "python-expert": {
+            "model": "claude-sonnet-4-6",
+            "max_iterations": 1,
+            "completion_promise": "TASK COMPLETE",
+            "timeout": 60,
+        }
+    }
+
+    node_fn = make_developer_node(
+        repo_path=str(repo),
+        branch_prefix="scaffold",
+        agent_loader=mock_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-001", level="task")
+    # agent_output is empty — developer should read from artifacts instead
+    state["agent_output"] = ""
+
+    with (
+        patch.object(DoerAgent, "create_worktree", return_value=repo),
+        patch.object(DoerAgent, "cleanup_worktree"),
+        patch.object(
+            DoerAgent,
+            "ralph_loop",
+            return_value=MagicMock(success=True, iterations=1, output="TASK COMPLETE"),
+        ),
+        patch("orchestrator.nodes.developer.subprocess"),
+    ):
+        node_fn(state)
+
+    call_args = mock_loader.load_specialist.call_args
+    task_context_arg = call_args[0][2] if len(call_args[0]) > 2 else ""
+    assert "REST API" in task_context_arg
+    assert "Build API" in task_context_arg
+
+
+def test_developer_writes_artifact(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    mock_loader = MagicMock()
+    mock_loader.load_specialist.return_value = "implement this"
+    mock_loader.detect_specialist.return_value = ""
+    agents_config = MagicMock()
+    agents_config.specialists = {
+        "python-expert": {
+            "model": "claude-sonnet-4-6",
+            "max_iterations": 1,
+            "completion_promise": "TASK COMPLETE",
+            "timeout": 60,
+        }
+    }
+
+    node_fn = make_developer_node(
+        repo_path=str(repo),
+        branch_prefix="scaffold",
+        agent_loader=mock_loader,
+        agents_config=agents_config,
+    )
+    state = initial_state(task_id="task-001", level="task")
+
+    with (
+        patch.object(DoerAgent, "create_worktree", return_value=repo),
+        patch.object(DoerAgent, "cleanup_worktree"),
+        patch.object(
+            DoerAgent,
+            "ralph_loop",
+            return_value=MagicMock(success=True, iterations=1, output="TASK COMPLETE"),
+        ),
+        patch("orchestrator.nodes.developer.subprocess"),
+    ):
+        node_fn(state)
+
+    artifact = repo / ".scaffold" / "artifacts" / "task-001" / "developer.md"
+    assert artifact.exists()
+    assert "TASK COMPLETE" in artifact.read_text()
