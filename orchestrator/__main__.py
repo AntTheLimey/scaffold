@@ -96,6 +96,7 @@ def run(spec, config, project):
                     state,
                     task_id,
                     max_budget_usd=cfg.project.max_budget_usd,
+                    repo_path=cfg.project.repo_path,
                 )
                 click.echo("Run complete.")
             except BudgetExceededError as e:

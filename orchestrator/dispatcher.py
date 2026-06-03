@@ -5,6 +5,7 @@ import json
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 
+from orchestrator.artifacts import write_artifact
 from orchestrator.budget import BudgetExceededError
 from orchestrator.event_bus import get_bus
 from orchestrator.state import TaskState, initial_state
@@ -72,6 +73,7 @@ def run_task(
     state: TaskState,
     thread_id: str,
     max_budget_usd: float | None = None,
+    repo_path: str = "",
 ) -> dict:
     config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
     bus = get_bus()
@@ -156,8 +158,11 @@ def run_task(
             child_spec += "Acceptance criteria:\n"
             child_spec += "\n".join(f"- {ac}" for ac in criteria)
         child_state["agent_output"] = child_spec
+        write_artifact(repo_path, child_id, "task_spec", child_spec)
 
-        run_task(graph, tree, child_state, child_id, max_budget_usd=max_budget_usd)
+        run_task(
+            graph, tree, child_state, child_id, max_budget_usd=max_budget_usd, repo_path=repo_path
+        )
         child_row = tree.get(child_id)
         child_statuses.append(child_row["status"] if child_row else "stuck")
 
