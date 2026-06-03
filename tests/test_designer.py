@@ -13,12 +13,14 @@ def mock_client():
     response = MagicMock()
     response.content = [
         MagicMock(
+            type="text",
             text="Clock component: SVG circle, 4/6/8/12 segments. "
-            "Click to fill/unfill. Animate on tick."
+            "Click to fill/unfill. Animate on tick.",
         )
     ]
     response.usage.input_tokens = 400
     response.usage.output_tokens = 200
+    response.stop_reason = "end_turn"
     client.messages.create.return_value = response
     return client
 
@@ -101,3 +103,24 @@ def test_designer_passes_tools_to_advisor(mock_client, mock_agent_loader):
     assert "tools" in call_args.kwargs
     tool_names = {t["name"] for t in call_args.kwargs["tools"]}
     assert tool_names == {"read_file", "list_directory", "grep"}
+
+
+def test_designer_writes_artifact(mock_client, mock_agent_loader, tmp_path):
+    node_fn = make_designer_node(mock_client, mock_agent_loader, repo_path=str(tmp_path))
+    state = initial_state(task_id="feat-001", level="feature")
+    node_fn(state)
+    artifact = tmp_path / ".scaffold" / "artifacts" / "feat-001" / "designer.md"
+    assert artifact.exists()
+
+
+def test_designer_reads_task_spec_artifact(mock_client, mock_agent_loader, tmp_path):
+    spec_dir = tmp_path / ".scaffold" / "artifacts" / "feat-001"
+    spec_dir.mkdir(parents=True)
+    (spec_dir / "task_spec.md").write_text("# Dashboard UI\n\nAcceptance criteria:\n- Shows stats")
+    node_fn = make_designer_node(mock_client, mock_agent_loader, repo_path=str(tmp_path))
+    state = initial_state(task_id="feat-001", level="feature")
+    node_fn(state)
+    call_args = mock_client.messages.create.call_args
+    messages = call_args.kwargs["messages"]
+    user_msg = messages[0]["content"]
+    assert "Dashboard UI" in user_msg

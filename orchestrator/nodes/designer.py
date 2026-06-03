@@ -1,6 +1,7 @@
 import functools
 
 from orchestrator.agent_loader import AgentLoader
+from orchestrator.artifacts import read_artifact, write_artifact
 from orchestrator.event_bus import get_bus
 from orchestrator.nodes.base import AdvisorAgent
 from orchestrator.state import TaskState
@@ -39,7 +40,10 @@ def make_designer_node(
         if project_context:
             system_prompt += f"\n\n--- Project Context ---\n{project_context}\n---"
 
+        task_spec = read_artifact(repo_path, state["task_id"], "task_spec")
         user_message = f"Create a UI/UX specification for this task.\n\nTask: {state['task_id']}\n"
+        if task_spec:
+            user_message += f"\n{task_spec}\n"
         if bus:
             bus.api_call_start(
                 "designer", model, len(system_prompt) + len(user_message), state["task_id"]
@@ -58,6 +62,7 @@ def make_designer_node(
             if scaffold_budget_usd is not None:
                 bus.check_budget(scaffold_budget_usd)
             bus.node_exit("designer", state["task_id"])
+        write_artifact(repo_path, state["task_id"], "designer", result.text)
         return {"agent_output": result.text}
 
     return designer_node
