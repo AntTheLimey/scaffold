@@ -11,6 +11,7 @@ workflow:
   reviewer:
     model: claude-sonnet-4-6
     execution: cli
+    timeout: 600
   qa:
     model: claude-sonnet-4-6
     execution: cli

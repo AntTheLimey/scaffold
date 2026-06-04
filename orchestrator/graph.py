@@ -162,9 +162,12 @@ def build_graph(
         ),
     )
     reviewer_model = _model("reviewer", "claude-sonnet-4-6")
+    reviewer_timeout = agents_config.workflow.get("reviewer", {}).get("timeout", 600)
     graph.add_node(
         "reviewer",
-        make_reviewer_node(repo_path, branch_prefix, reviewer_model, agent_loader),
+        make_reviewer_node(
+            repo_path, branch_prefix, reviewer_model, agent_loader, timeout=reviewer_timeout
+        ),
     )
     qa_model = _model("qa", "claude-sonnet-4-6")
     graph.add_node(
