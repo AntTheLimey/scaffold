@@ -569,7 +569,7 @@ def test_clean_removes_scaffold_artifacts(runner, tmp_path):
         )
     assert result.exit_code == 0
     assert not (repo / ".scaffold" / "artifacts").exists()
-    assert "removed artifacts" in result.output
+    assert "removed scaffold data" in result.output
 
 
 def test_cli_run_budget_exceeded_exits_nonzero(runner, tmp_path, config_dir):

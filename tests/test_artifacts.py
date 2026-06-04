@@ -44,3 +44,20 @@ def test_write_artifact_no_op_when_no_repo_path():
 def test_read_artifact_returns_empty_when_no_repo_path():
     content = read_artifact("", "task-001", "architect")
     assert content == ""
+
+
+def test_write_artifact_returns_none_on_os_error(tmp_path):
+    bad_path = str(tmp_path / "nonexistent" / "deep" / "path")
+    # Create a file where a directory is expected to block mkdir
+    blocker = tmp_path / "nonexistent"
+    blocker.write_text("file, not dir")
+    result = write_artifact(bad_path, "task-001", "architect", "content")
+    assert result is None
+
+
+def test_read_artifact_returns_empty_on_os_error(tmp_path):
+    # Create a directory where the .md file would be, causing read_text to fail
+    artifact_file = tmp_path / ".scaffold" / "artifacts" / "task-001" / "architect.md"
+    artifact_file.mkdir(parents=True)
+    content = read_artifact(str(tmp_path), "task-001", "architect")
+    assert content == ""

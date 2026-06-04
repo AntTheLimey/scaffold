@@ -41,9 +41,10 @@ def make_designer_node(
             system_prompt += f"\n\n--- Project Context ---\n{project_context}\n---"
 
         task_spec = read_artifact(repo_path, state["task_id"], "task_spec")
+        agent_output = task_spec or state.get("agent_output", "")
         user_message = f"Create a UI/UX specification for this task.\n\nTask: {state['task_id']}\n"
-        if task_spec:
-            user_message += f"\n{task_spec}\n"
+        if agent_output:
+            user_message += f"\n{agent_output}\n"
         if bus:
             bus.api_call_start(
                 "designer", model, len(system_prompt) + len(user_message), state["task_id"]

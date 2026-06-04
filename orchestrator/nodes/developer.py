@@ -39,7 +39,7 @@ def make_developer_node(
         architect_output = read_artifact(repo_path, state["task_id"], "architect")
         task_spec = read_artifact(repo_path, state["task_id"], "task_spec")
         designer_output = read_artifact(repo_path, state["task_id"], "designer")
-        agent_output = architect_output or state.get("agent_output", "")
+        agent_output = architect_output or task_spec or state.get("agent_output", "")
         specialist_names = state.get("specialists", [])
         advisory_names = state.get("advisory", [])
 

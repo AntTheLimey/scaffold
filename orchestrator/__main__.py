@@ -365,7 +365,7 @@ def clean(repo, db, yes):
     if checkpoint_path.exists():
         click.echo(f"  checkpoints: {checkpoint_path}")
     if scaffold_dir.exists():
-        click.echo(f"  artifacts: {scaffold_dir}")
+        click.echo(f"  scaffold data: {scaffold_dir}")
 
     if not yes:
         click.confirm("Proceed?", abort=True)
@@ -398,7 +398,7 @@ def clean(repo, db, yes):
 
     if scaffold_dir.exists():
         shutil.rmtree(scaffold_dir)
-        click.echo(f"  removed artifacts: {scaffold_dir}")
+        click.echo(f"  removed scaffold data: {scaffold_dir}")
 
     for suffix in ["-wal", "-shm"]:
         wal_path = Path(f"{db}{suffix}")
