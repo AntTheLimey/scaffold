@@ -27,6 +27,7 @@ Project-agnostic — configured via YAML to target any repository.
   - **event_bus.py** — SQLite-backed event bus for observability (node enter/exit, API/CLI calls, costs, tool calls)
   - **json_utils.py** — JSON extraction from mixed text (agent output parsing)
   - **tools.py** — read-only codebase tools (read_file, list_directory, grep) for AdvisorAgent tool use
+  - **artifacts.py** — file-based artifact handoff between pipeline nodes
 - **config/** — YAML configuration (governance.yaml, agents.yaml, projects/)
 - **db/** — SQLite schema (schema.sql)
 - **tests/** — pytest test suite
@@ -55,6 +56,10 @@ START → onboarding → intake_router → product_owner → architect → [desi
 ```
 
 The onboarding node detects project context and configures the specialist roster. The developer node selects the appropriate specialist using a cascading priority: architect-declared specialist → architect file paths → regex file extraction → onboarding roster → detected languages → python-expert fallback.
+
+### Artifact Handoff
+
+Pipeline nodes exchange context through persistent files at `{target_repo}/.scaffold/artifacts/{task_id}/{role}.md`. Each node writes its output as an artifact and downstream nodes read from these files (falling back to `agent_output` in LangGraph state for backward compatibility). The dispatcher writes child task specs to `task_spec.md`. Artifact I/O is best-effort — disk errors degrade persistence but don't abort orchestration. The `scaffold clean` command removes the `.scaffold/` directory.
 
 ## Development
 
