@@ -1,6 +1,7 @@
 import functools
 
 from orchestrator.agent_loader import AgentLoader
+from orchestrator.artifacts import read_artifact, write_artifact
 from orchestrator.event_bus import get_bus
 from orchestrator.json_utils import extract_json
 from orchestrator.nodes.base import AdvisorAgent
@@ -44,7 +45,8 @@ def make_architect_node(
         if project_context:
             system_prompt += f"\n\n--- Project Context ---\n{project_context}\n---"
 
-        agent_output = state.get("agent_output", "")
+        task_spec = read_artifact(repo_path, state["task_id"], "task_spec")
+        agent_output = task_spec or state.get("agent_output", "")
         user_message = (
             f"Design the technical approach for this feature.\n\n"
             f"Task: {state['task_id']}\n"
@@ -72,6 +74,7 @@ def make_architect_node(
             if scaffold_budget_usd is not None:
                 bus.check_budget(scaffold_budget_usd)
 
+        write_artifact(repo_path, state["task_id"], "architect", result.text)
         parsed = extract_json(result.text)
         output = {
             "has_ui_component": parsed.get("has_ui_component", False),

@@ -554,6 +554,24 @@ def test_clean_nothing_to_clean(runner, tmp_path):
     assert "Nothing to clean" in result.output
 
 
+def test_clean_removes_scaffold_artifacts(runner, tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    artifact_dir = repo / ".scaffold" / "artifacts" / "task-001"
+    artifact_dir.mkdir(parents=True)
+    (artifact_dir / "architect.md").write_text("design")
+
+    with patch("subprocess.run") as mock_sp:
+        mock_sp.return_value = MagicMock(stdout="", returncode=0)
+        result = runner.invoke(
+            cli,
+            ["clean", "--repo", str(repo), "--db", str(tmp_path / "none.db"), "--yes"],
+        )
+    assert result.exit_code == 0
+    assert not (repo / ".scaffold" / "artifacts").exists()
+    assert "removed scaffold data" in result.output
+
+
 def test_cli_run_budget_exceeded_exits_nonzero(runner, tmp_path, config_dir):
     spec = tmp_path / "spec.md"
     spec.write_text("# Test Spec")

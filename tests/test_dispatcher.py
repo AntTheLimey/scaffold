@@ -406,3 +406,46 @@ def test_run_task_respects_depends_on_ordering(db):
     auth_idx = execution_order.index("Auth")
     assert schema_idx < seed_idx
     assert schema_idx < auth_idx
+
+
+def test_run_task_writes_child_spec_artifact(db, tmp_path):
+    from orchestrator.task_tree import TaskTree
+
+    tree = TaskTree(db)
+    parent_id = tree.create(title="Epic", level="epic")
+
+    graph = MagicMock()
+
+    def mock_invoke(state, config=None):
+        if state["level"] == "epic":
+            return {
+                "status": "decomposing",
+                "child_tasks": [
+                    {
+                        "title": "Auth Module",
+                        "level": "task",
+                        "spec_ref": "Section 2.1",
+                        "acceptance": ["JWT validates", "Tokens expire"],
+                    },
+                ],
+                "project_context": "",
+                "specialists": [],
+                "advisory": [],
+                "detected_languages": [],
+                "test_framework": "",
+            }
+        return {"status": "done", "child_tasks": []}
+
+    graph.invoke.side_effect = mock_invoke
+
+    state = initial_state(task_id=parent_id, level="epic")
+    run_task(graph, tree, state, parent_id, repo_path=str(tmp_path))
+
+    children = tree.list_children(parent_id)
+    child_id = children[0]["id"]
+    artifact_path = tmp_path / ".scaffold" / "artifacts" / child_id / "task_spec.md"
+    assert artifact_path.exists()
+    content = artifact_path.read_text()
+    assert "Auth Module" in content
+    assert "JWT validates" in content
+    assert "Section 2.1" in content

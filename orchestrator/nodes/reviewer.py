@@ -2,6 +2,7 @@ import subprocess
 from pathlib import Path
 
 from orchestrator.agent_loader import AgentLoader
+from orchestrator.artifacts import write_artifact
 from orchestrator.event_bus import get_bus
 from orchestrator.json_utils import extract_json
 from orchestrator.state import TaskState
@@ -61,6 +62,8 @@ def make_reviewer_node(repo_path: str, branch_prefix: str, model: str, agent_loa
                 cwd=repo_path,
                 capture_output=True,
             )
+
+        write_artifact(repo_path, state["task_id"], "reviewer", result.stdout)
 
         parsed = extract_json(result.stdout)
         verdict = parsed.get("verdict", "revise")

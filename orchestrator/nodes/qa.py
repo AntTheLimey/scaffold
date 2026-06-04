@@ -1,4 +1,5 @@
 from orchestrator.agent_loader import AgentLoader
+from orchestrator.artifacts import write_artifact
 from orchestrator.event_bus import get_bus
 from orchestrator.nodes.base import DoerAgent
 from orchestrator.state import TaskState
@@ -38,6 +39,8 @@ def make_qa_node(repo_path: str, branch_prefix: str, model: str, agent_loader: A
             )
         finally:
             doer.cleanup_worktree(repo_path, worktree_path)
+
+        write_artifact(repo_path, state["task_id"], "qa", result.output)
 
         if result.success:
             if bus:

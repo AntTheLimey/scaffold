@@ -2,6 +2,7 @@ import functools
 from pathlib import Path
 
 from orchestrator.agent_loader import AgentLoader
+from orchestrator.artifacts import write_artifact
 from orchestrator.event_bus import get_bus
 from orchestrator.json_utils import extract_json
 from orchestrator.nodes.base import AdvisorAgent
@@ -77,6 +78,8 @@ def make_product_owner_node(
             )
             if scaffold_budget_usd is not None:
                 bus.check_budget(scaffold_budget_usd)
+
+        write_artifact(repo_path, state["task_id"], "product_owner", result.text)
 
         parsed = extract_json(result.text)
         children = parsed.get("children", [])

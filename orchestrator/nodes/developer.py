@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 
 from orchestrator.agent_loader import AgentLoader
+from orchestrator.artifacts import read_artifact, write_artifact
 from orchestrator.config import AgentsConfig
 from orchestrator.event_bus import get_bus
 from orchestrator.nodes.base import AdvisorAgent, DoerAgent
@@ -35,7 +36,10 @@ def make_developer_node(
         if bus:
             bus.node_enter("developer", state["task_id"], state["level"])
         # 1. Read task context
-        agent_output = state.get("agent_output", "")
+        architect_output = read_artifact(repo_path, state["task_id"], "architect")
+        task_spec = read_artifact(repo_path, state["task_id"], "task_spec")
+        designer_output = read_artifact(repo_path, state["task_id"], "designer")
+        agent_output = architect_output or task_spec or state.get("agent_output", "")
         specialist_names = state.get("specialists", [])
         advisory_names = state.get("advisory", [])
 
@@ -117,7 +121,16 @@ def make_developer_node(
                 advisory_input = "\n\n".join(recommendations)
 
         # 6. Assemble implementation prompt
-        task_context = f"Task: {state['task_id']}\n\nTechnical design:\n{agent_output}\n"
+        context_parts = [f"Task: {state['task_id']}"]
+        if task_spec:
+            context_parts.append(f"Task specification:\n{task_spec}")
+        if architect_output:
+            context_parts.append(f"Technical design:\n{architect_output}")
+        if designer_output:
+            context_parts.append(f"UI/UX specification:\n{designer_output}")
+        if not architect_output and not task_spec:
+            context_parts.append(f"Technical design:\n{agent_output}")
+        task_context = "\n\n".join(context_parts) + "\n"
         prompt = agent_loader.load_specialist(
             specialist_name, Path(repo_path), task_context, advisory_input
         )
@@ -182,6 +195,8 @@ def make_developer_node(
                 )
         finally:
             doer.cleanup_worktree(repo_path, worktree_path)
+
+        write_artifact(repo_path, state["task_id"], "developer", result.output)
 
         # 10. Return result
         if result.success:

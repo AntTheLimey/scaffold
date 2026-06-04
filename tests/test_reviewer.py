@@ -189,3 +189,19 @@ def test_reviewer_cleans_up_worktree(mock_run):
     remove_call = mock_run.call_args_list[2]
     assert remove_call.args[0][0] == "git"
     assert "remove" in remove_call.args[0]
+
+
+@patch("orchestrator.nodes.reviewer.subprocess.run")
+def test_reviewer_writes_artifact(mock_run, tmp_path):
+    mock_run.side_effect = _worktree_side_effect(json.dumps({"verdict": "approve", "feedback": ""}))
+    node_fn = make_reviewer_node(
+        repo_path=str(tmp_path),
+        branch_prefix="scaffold",
+        model="claude-sonnet-4-20250514",
+        agent_loader=_make_mock_loader(),
+    )
+    state = initial_state(task_id="task-001", level="task")
+    node_fn(state)
+    artifact = tmp_path / ".scaffold" / "artifacts" / "task-001" / "reviewer.md"
+    assert artifact.exists()
+    assert "approve" in artifact.read_text()

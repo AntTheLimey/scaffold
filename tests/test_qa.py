@@ -72,3 +72,24 @@ def test_qa_uses_agent_loader(MockDoer):
     state = initial_state(task_id="task-001", level="task")
     node_fn(state)
     loader.load_workflow_agent.assert_called_once_with("qa")
+
+
+@patch("orchestrator.nodes.qa.DoerAgent")
+def test_qa_writes_artifact(MockDoer, tmp_path):
+    doer = MockDoer.return_value
+    doer.ralph_loop.return_value = RalphResult(
+        success=True, iterations=1, output="All pass.\nTESTS PASSING"
+    )
+    doer.create_worktree.return_value = str(tmp_path / "worktree")
+    doer.cleanup_worktree = MagicMock()
+    node_fn = make_qa_node(
+        repo_path=str(tmp_path),
+        branch_prefix="scaffold",
+        model="claude-sonnet-4-20250514",
+        agent_loader=_make_mock_loader(),
+    )
+    state = initial_state(task_id="task-001", level="task")
+    node_fn(state)
+    artifact = tmp_path / ".scaffold" / "artifacts" / "task-001" / "qa.md"
+    assert artifact.exists()
+    assert "TESTS PASSING" in artifact.read_text()

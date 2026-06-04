@@ -14,6 +14,7 @@ def mock_client():
     response = MagicMock()
     response.content = [
         MagicMock(
+            type="text",
             text=json.dumps(
                 {
                     "children": [
@@ -31,11 +32,12 @@ def mock_client():
                         },
                     ]
                 }
-            )
+            ),
         )
     ]
     response.usage.input_tokens = 800
     response.usage.output_tokens = 300
+    response.stop_reason = "end_turn"
     client.messages.create.return_value = response
     return client
 
@@ -132,3 +134,16 @@ def test_product_owner_passes_tools_to_advisor(mock_client, mock_agent_loader):
     assert "tools" in call_args.kwargs
     tool_names = {t["name"] for t in call_args.kwargs["tools"]}
     assert tool_names == {"read_file", "list_directory", "grep"}
+
+
+def test_product_owner_writes_artifact(mock_client, mock_agent_loader, tmp_path):
+    spec = tmp_path / "spec.md"
+    spec.write_text("Build auth")
+    node_fn = make_product_owner_node(
+        mock_client, str(spec), mock_agent_loader, repo_path=str(tmp_path)
+    )
+    state = initial_state(task_id="epic-001", level="epic")
+    node_fn(state)
+    artifact = tmp_path / ".scaffold" / "artifacts" / "epic-001" / "product_owner.md"
+    assert artifact.exists()
+    assert "children" in artifact.read_text()
