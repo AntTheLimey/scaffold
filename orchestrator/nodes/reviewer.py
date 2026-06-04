@@ -19,7 +19,13 @@ def _reviewer_worktree_path(repo_path: str, branch: str) -> Path:
     return Path(repo_path).parent / f".worktrees/review-{branch.replace('/', '-')}"
 
 
-def make_reviewer_node(repo_path: str, branch_prefix: str, model: str, agent_loader: AgentLoader):
+def make_reviewer_node(
+    repo_path: str,
+    branch_prefix: str,
+    model: str,
+    agent_loader: AgentLoader,
+    timeout: int = 600,
+):
     def reviewer_node(state: TaskState) -> dict:
         bus = get_bus()
         if bus:
@@ -50,11 +56,12 @@ def make_reviewer_node(repo_path: str, branch_prefix: str, model: str, agent_loa
             if bus:
                 bus.cli_start("reviewer", model, 1, state["task_id"])
             result = subprocess.run(
-                ["claude", "-p", prompt, "--model", model],
+                ["claude", "-p", "-", "--model", model],
+                input=prompt,
                 capture_output=True,
                 text=True,
                 cwd=str(worktree_path),
-                timeout=300,
+                timeout=timeout,
             )
         finally:
             subprocess.run(

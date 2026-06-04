@@ -17,7 +17,7 @@ def _worktree_side_effect(claude_stdout: str, returncode: int = 0):
 
     Call order:
       1. git worktree add  → success (returncode 0)
-      2. claude -p         → the review output
+      2. claude -p -       → the review output (prompt via stdin)
       3. git worktree remove → success (returncode 0)
     """
     git_ok = MagicMock(stdout="", stderr="", returncode=0)
@@ -79,9 +79,8 @@ def test_reviewer_uses_configured_branch_prefix(mock_run):
     )
     state = initial_state(task_id="task-001", level="task")
     node_fn(state)
-    # The claude call is the second call (index 1)
     claude_call = mock_run.call_args_list[1]
-    prompt_text = " ".join(claude_call.args[0])
+    prompt_text = claude_call.kwargs["input"]
     assert "custom-prefix/task-001" in prompt_text
 
 
@@ -99,7 +98,7 @@ def test_reviewer_uses_agent_loader(mock_run):
     node_fn(state)
     loader.load_workflow_agent.assert_called_once_with("reviewer")
     claude_call = mock_run.call_args_list[1]
-    prompt_text = " ".join(claude_call.args[0])
+    prompt_text = claude_call.kwargs["input"]
     assert "my custom reviewer prompt" in prompt_text
 
 
@@ -116,7 +115,7 @@ def test_reviewer_appends_project_context(mock_run):
     state["project_context"] = "Use strict type checking throughout."
     node_fn(state)
     claude_call = mock_run.call_args_list[1]
-    prompt_text = " ".join(claude_call.args[0])
+    prompt_text = claude_call.kwargs["input"]
     assert "Use strict type checking throughout." in prompt_text
 
 
@@ -133,8 +132,41 @@ def test_reviewer_falls_back_to_inline_prompt(mock_run):
     state = initial_state(task_id="task-001", level="task")
     node_fn(state)
     claude_call = mock_run.call_args_list[1]
-    prompt_text = " ".join(claude_call.args[0])
+    prompt_text = claude_call.kwargs["input"]
     assert "code review engine" in prompt_text
+
+
+@patch("orchestrator.nodes.reviewer.subprocess.run")
+def test_reviewer_passes_prompt_via_stdin(mock_run):
+    mock_run.side_effect = _worktree_side_effect(json.dumps({"verdict": "approve", "feedback": ""}))
+    node_fn = make_reviewer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        model="claude-sonnet-4-20250514",
+        agent_loader=_make_mock_loader(),
+    )
+    state = initial_state(task_id="task-001", level="task")
+    node_fn(state)
+    claude_call = mock_run.call_args_list[1]
+    assert claude_call.args[0] == ["claude", "-p", "-", "--model", "claude-sonnet-4-20250514"]
+    assert "input" in claude_call.kwargs
+    assert "loaded reviewer prompt" in claude_call.kwargs["input"]
+
+
+@patch("orchestrator.nodes.reviewer.subprocess.run")
+def test_reviewer_uses_configured_timeout(mock_run):
+    mock_run.side_effect = _worktree_side_effect(json.dumps({"verdict": "approve", "feedback": ""}))
+    node_fn = make_reviewer_node(
+        repo_path="/tmp/repo",
+        branch_prefix="scaffold",
+        model="claude-sonnet-4-20250514",
+        agent_loader=_make_mock_loader(),
+        timeout=900,
+    )
+    state = initial_state(task_id="task-001", level="task")
+    node_fn(state)
+    claude_call = mock_run.call_args_list[1]
+    assert claude_call.kwargs["timeout"] == 900
 
 
 @patch("orchestrator.nodes.reviewer.subprocess.run")
